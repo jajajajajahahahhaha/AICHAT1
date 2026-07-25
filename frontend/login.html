@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kimi Chat — Login</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    body { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); }
+    .auth-card {
+      width: 100%; max-width: 400px;
+      background: var(--bg-sidebar);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px 28px;
+      box-shadow: var(--shadow);
+    }
+    .auth-logo { font-size: 44px; text-align: center; margin-bottom: 8px; }
+    .auth-card h1 { text-align: center; font-size: 22px; margin-bottom: 6px; }
+    .auth-card .subtitle { text-align: center; color: var(--text-dim); font-size: 13.5px; margin-bottom: 24px; }
+    .auth-tabs {
+      display: flex; gap: 4px;
+      background: var(--bg-hover);
+      padding: 4px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+    .auth-tab {
+      flex: 1;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13.5px;
+      color: var(--text-dim);
+      background: transparent;
+      transition: background .15s, color .15s;
+    }
+    .auth-tab.active { background: var(--bg); color: var(--text); }
+    .auth-field { margin-bottom: 14px; }
+    .auth-field label {
+      display: block; font-size: 12.5px; color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+    .auth-field input {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14.5px;
+      outline: none;
+      transition: border-color .15s;
+    }
+    .auth-field input:focus { border-color: var(--accent); }
+    .auth-submit {
+      width: 100%;
+      padding: 12px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 14.5px;
+      margin-top: 6px;
+      transition: background .15s, transform .1s;
+    }
+    .auth-submit:hover { background: var(--accent-hover); }
+    .auth-submit:active { transform: scale(0.98); }
+    .auth-submit:disabled { opacity: .6; cursor: not-allowed; }
+    .auth-error {
+      background: rgba(239,68,68,0.12);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: #f87171;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 12px;
+      display: none;
+    }
+    .auth-error.show { display: block; }
+    .auth-hint { text-align: center; margin-top: 14px; font-size: 12px; color: var(--text-faint); }
+    .auth-hint code { background: var(--bg-hover); padding: 2px 6px; border-radius: 4px; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <div class="auth-logo">✨</div>
+    <h1 id="authTitle">Welcome to Kimi Chat</h1>
+    <div class="subtitle" id="authSubtitle">Sign in or create an account to continue</div>
+
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="tabLogin">Login</button>
+      <button class="auth-tab" id="tabRegister">Sign up</button>
+    </div>
+
+    <div class="auth-error" id="authError"></div>
+
+    <form id="authForm">
+      <div class="auth-field">
+        <label for="username">Username</label>
+        <input type="text" id="username" autocomplete="username" required />
+      </div>
+      <div class="auth-field">
+        <label for="password">Password</label>
+        <input type="password" id="password" autocomplete="current-password" required />
+      </div>
+      <button type="submit" class="auth-submit" id="submitBtn">Sign in</button>
+    </form>
+
+    <div class="auth-hint">
+      Owner: <code>admin</code> / <code>admin</code>
+    </div>
+  </div>
+
+  <script>
+    let mode = "login";
+    const authError = document.getElementById("authError");
+    const submitBtn = document.getElementById("submitBtn");
+    const tabLogin = document.getElementById("tabLogin");
+    const tabRegister = document.getElementById("tabRegister");
+
+    function setMode(m) {
+      mode = m;
+      tabLogin.classList.toggle("active", m === "login");
+      tabRegister.classList.toggle("active", m === "register");
+      submitBtn.textContent = m === "login" ? "Sign in" : "Create account";
+      authError.classList.remove("show");
+    }
+    tabLogin.addEventListener("click", () => setMode("login"));
+    tabRegister.addEventListener("click", () => setMode("register"));
+
+    document.getElementById("authForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+      if (!username || !password) return;
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Please wait...";
+      authError.classList.remove("show");
+
+      try {
+        const url = mode === "login" ? "/api/auth/login" : "/api/auth/register";
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || "Failed");
+        // Save token and redirect
+        localStorage.setItem("kimi_token", data.token);
+        localStorage.setItem("kimi_username", data.username);
+        localStorage.setItem("kimi_is_owner", data.is_owner ? "1" : "0");
+        window.location.href = "/";
+      } catch (err) {
+        authError.textContent = err.message;
+        authError.classList.add("show");
+        submitBtn.disabled = false;
+        submitBtn.textContent = mode === "login" ? "Sign in" : "Create account";
+      }
+    });
+
+    // Auto-redirect if already logged in
+    if (localStorage.getItem("kimi_token")) {
+      fetch("/api/auth/me", {
+        headers: { "Authorization": "Bearer " + localStorage.getItem("kimi_token") },
+      }).then(r => {
+        if (r.ok) window.location.href = "/";
+        else localStorage.removeItem("kimi_token");
+      });
+    }
+  </script>
+</body>
+</html>

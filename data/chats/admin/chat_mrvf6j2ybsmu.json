@@ -1,0 +1,68 @@
+{
+  "id": "chat_mrvf6j2ybsmu",
+  "title": "الان تو چه ابزار های داری",
+  "messages": [
+    {
+      "role": "user",
+      "content": "الان تو چه ابزار های داری",
+      "display_content": "الان تو چه ابزار های داری",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " من در حال حاضر به ۴ ابزار اصلی دسترسی دارم:\n\n1. **🔍 جستجوی وب (web_search)**  \n   با استفاده از DuckDuckGo می‌توانم اطلاعات به‌روز، اخبار جدید و رویدادهای اخیر را از اینترنت جستجو کنم.\n\n2. **💻 اجرای کد (run_code)**  \n   می‌توانم کد را در یک محیط امن اجرا کنم. از زبان‌های **Python**، **Bash** و **HTML** پشتیبانی می‌شود. این ابزار برای تست کد، دیباگ، محاسبات یا ساخت فایل‌های HTML کاربرد دارد.\n\n3. **🖼️ تحلیل تصویر (analyze_image)**  \n   اگر شما تصویری آپلود کرده باشید، می‌توانم آن را بررسی کنم، متن داخل آن را استخراج کنم (OCR)، یا درباره محتوای بصری آن توضیح دهم.\n\n4. **🎨 تولید تصویر (generate_image)**  \n   می‌توانم بر اساس توضیحات متنی شما، تصویر تولید کنم (با استفاده از Pollinations.ai). می‌توانید سبک، نورپردازی، ترکیب‌بندی و جزئیات را مشخص کنید.\n\nاگر نیاز به استفاده از هر کدام از این ابزارها داری، فقط بگو! 🚀",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "الان تو چه سالی هستیم",
+      "display_content": "الان تو چه سالی هستیم",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " ما الان در سال **۲۰۲۶** میلادی هستیم.\n\nاز نظر تقویم شمسی هم الان سال **۱۴۰۵** است و امروز **۳۱ تیر ۱۴۰۵** می‌باشد. 🗓️",
+      "tool_events": [
+        {
+          "name": "web_search",
+          "args": {
+            "query": "current date today year Persian calendar 1403 2024",
+            "max_results": 3
+          },
+          "id": "functions.web_search:0"
+        },
+        {
+          "name": "run_code",
+          "args": {
+            "language": "python",
+            "code": "from datetime import datetime\n\nnow = datetime.now()\nprint(f\"میلادی: {now.strftime('%Y/%m/%d')}\")\nprint(f\"روز هفته: {now.strftime('%A')}\")\n"
+          },
+          "id": "functions.run_code:1"
+        },
+        {
+          "name": "run_code",
+          "args": {
+            "language": "python",
+            "code": "from datetime import datetime\n\n# امروز\nnow = datetime.now()\nprint(f\"میلادی: {now.strftime('%Y/%m/%d')}\")\n\n# تبدیل میلادی به شمسی (الگوریتم ساده)\ndef gregorian_to_jalali(gy, gm, gd):\n    g_d_m = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334]\n    if gy > 1600:\n        jy = 979\n        gy -= 1600\n    else:\n        jy = 0\n        gy -= 621\n    if gm > 2:\n        gy2 = gy + 1\n    else:\n        gy2 = gy\n    days = (365 * gy) + ((gy2 + 3) // 4) - ((gy2 + 99) // 100) + ((gy2 + 399) // 400) - 80 + gd + g_d_m[gm - 1]\n    jy += 33 * (days // 12053)\n    days %= 12053\n    jy += 4 * (days // 1461)\n    days %= 1461\n    if days > 365:\n        jy += (days - 1) // 365\n        days = (days - 1) % 365\n    if days < 186:\n        jm = 1 + (days // 31)\n        jd = 1 + (days % 31)\n    else:\n        jm = 7 + ((days - 186) // 30)\n        jd = 1 + ((days - 186) % 30)\n    return jy, jm, jd\n\njy, jm, jd = gregorian_to_jalali(now.year, now.month, now.day)\nmonths = ['', 'فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند']\nprint(f\"شمسی: {jy}/{jm:02d}/{jd:02d}\")\nprint(f\"تاریخ شمسی دقیق: {jd} {months[jm]} {jy}\")\n"
+          },
+          "id": "functions.run_code:2"
+        }
+      ],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "یه html بنویس که از یک تا بینهایت با سرعت زیادی بشمره و به عداد فضای برسه UI هم خوب باشه",
+      "display_content": "یه html بنویس که از یک تا بینهایت با سرعت زیادی بشمره و به عداد فضای برسه UI هم خوب باشه",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    }
+  ],
+  "updated_at": 1784684905.4042258
+}

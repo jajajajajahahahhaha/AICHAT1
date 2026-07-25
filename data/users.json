@@ -1,0 +1,20 @@
+{
+  "admin": {
+    "username": "admin",
+    "password_hash": "$2b$12$vmw8v45IYWRAjJ.nL9m9AOx2sBqat8GULEHK3DPyoo5ezWm9bLZbO",
+    "is_owner": true,
+    "created_at": 1784683735.300769
+  },
+  "xnxx": {
+    "username": "xnxx",
+    "password_hash": "$2b$12$Z1pkCmZspEhbS2Pvb9m8aumxnpPEECLeptp1HQCsRUuoaAdQqaF7O",
+    "is_owner": false,
+    "created_at": 1784685205.6366274
+  },
+  "tester1": {
+    "username": "tester1",
+    "password_hash": "$2b$12$Ck1x3xYXGxzIsh3/2NTNu.LcjgRREVkSAJb/43/J/pL49wsPFxgyC",
+    "is_owner": false,
+    "created_at": 1784709870.6850626
+  }
+}
