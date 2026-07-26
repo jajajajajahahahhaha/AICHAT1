@@ -1,0 +1,53 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest pytest-asyncio ruff
+
+      - name: Lint (ruff)
+        run: |
+          ruff check backend/ --select E,F,W --ignore E501,E402 --exit-zero
+
+      - name: Syntax check
+        run: |
+          python -m py_compile backend/server.py backend/kimi_client.py backend/auth.py \
+            backend/tools/__init__.py backend/tools/search.py \
+            backend/tools/sandbox.py backend/tools/vision.py backend/tools/image_gen.py
+          echo "All Python files compile successfully."
+
+      - name: Frontend syntax check
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -qq -y nodejs
+          node --check frontend/js/app.js
+          node --check frontend/js/i18n.js
+          echo "Frontend JS is syntactically valid."
+
+      - name: Run pytest
+        env:
+          KIMI_API_KEY: "test_key_dummy"
+          KIMI_BASE_URL: "https://example.invalid/v1"
+          KIMI_MODEL: "test-model"
+        run: |
+          pytest tests/ -v --tb=short --asyncio-mode=auto
