@@ -8,7 +8,9 @@
       "display_content": "سلام داداش",
       "images": [],
       "image_ids": [],
-      "file_names": []
+      "file_names": [],
+      "tool_events": [],
+      "generated_images": []
     },
     {
       "role": "assistant",
@@ -22,7 +24,9 @@
       "display_content": "من اونر هستم الان",
       "images": [],
       "image_ids": [],
-      "file_names": []
+      "file_names": [],
+      "tool_events": [],
+      "generated_images": []
     },
     {
       "role": "assistant",
@@ -36,7 +40,9 @@
       "display_content": "ببین میتونی رد می ریپو رو بخونی",
       "images": [],
       "image_ids": [],
-      "file_names": []
+      "file_names": [],
+      "tool_events": [],
+      "generated_images": []
     },
     {
       "role": "assistant",
@@ -55,5 +61,5 @@
       "generated_images": []
     }
   ],
-  "updated_at": 1785092652.4682631
+  "updated_at": 1785092938.7257092
 }
