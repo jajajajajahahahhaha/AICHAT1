@@ -13,37 +13,56 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-# Set a fake key so KimiClient init doesn't blow up
+# Set a fake key so KimiClient init doesn't blow up. Also set a deterministic
+# OWNER_PASS so we can log in as the owner in tests.
 os.environ.setdefault("KIMI_API_KEY", "dahl_test_key")
 os.environ.setdefault("KIMI_BASE_URL", "https://kimi-proxy.abol89898.workers.dev/v1")
 os.environ.setdefault("KIMI_MODEL", "moonshotai/Kimi-K2.6")
+os.environ["OWNER_PASS"] = "test_owner_pw_123"
 
 
 def test_auth_module():
-    from backend import auth
-    auth.ensure_owner()
-    # Owner exists
-    users = auth._load_users()
-    assert "admin" in users
-    assert users["admin"]["is_owner"] is True
+    # Re-import so the OWNER_PASS override takes effect.
+    import importlib
+    from backend import auth as _auth
+    importlib.reload(_auth)
+    auth = _auth
 
-    # Login as owner
-    r = auth.login("admin", "admin")
+    auth.ensure_owner()
+    # Owner exists with the new ADMIN username
+    users = auth._load_users()
+    assert auth.OWNER_USERNAME == "ADMIN"
+    assert "ADMIN" in users
+    assert users["ADMIN"]["is_owner"] is True
+
+    # Login as owner (correct password)
+    r = auth.login("ADMIN", "test_owner_pw_123")
     assert r["ok"], r
     assert r["is_owner"] is True
     token = r["token"]
 
+    # Wrong password fails
+    bad = auth.login("ADMIN", "wrong")
+    assert not bad["ok"]
+
     # Verify token
     session = auth.verify_token(token)
-    assert session and session["username"] == "admin"
+    assert session and session["username"] == "ADMIN"
 
     # Register a new user
     tname = "pytest_user_" + os.urandom(3).hex()
     r = auth.register(tname, "pw123")
     assert r["ok"], r
+    assert r["is_owner"] is False
     r2 = auth.login(tname, "pw123")
     assert r2["ok"]
     assert r2["is_owner"] is False
+
+    # Cannot register a user that would collide with the owner name (any case)
+    r_col = auth.register("admin", "whatever")
+    assert not r_col["ok"], "should not be able to register reserved owner name"
+    r_col2 = auth.register("ADMIN", "whatever")
+    assert not r_col2["ok"]
 
     # List / delete
     lst = auth.list_users()
@@ -51,13 +70,17 @@ def test_auth_module():
     r3 = auth.delete_user(tname)
     assert r3["ok"]
 
-    # Can't delete admin
-    r4 = auth.delete_user("admin")
+    # Can't delete owner (any case)
+    r4 = auth.delete_user("ADMIN")
     assert not r4["ok"]
+    r4b = auth.delete_user("admin")
+    assert not r4b["ok"]
 
-    # Owner login case-insensitive
-    r5 = auth.login("ADMIN", "admin")
+    # Owner login is case-insensitive on the username
+    r5 = auth.login("admin", "test_owner_pw_123")
     assert r5["ok"] and r5["is_owner"]
+    # And normalises the display username to ADMIN
+    assert r5["username"] == "ADMIN"
 
     print("✓ auth module OK")
 
@@ -117,6 +140,16 @@ def test_image_store():
     print("✓ image store OK")
 
 
+def test_analyze_image_missing_id():
+    """analyze_image with an unknown id must return a structured error, not raise."""
+    from backend.tools.vision import analyze_image
+    r = asyncio.run(analyze_image("img_does_not_exist_xyz", "what is this?"))
+    assert isinstance(r, dict)
+    assert r.get("success") is False
+    assert "error" in r
+    print("✓ analyze_image missing-id OK")
+
+
 def test_kimi_client_init():
     from backend.kimi_client import KimiClient
     c = KimiClient()
@@ -141,11 +174,19 @@ def test_fastapi_routes_exist():
 
 
 def test_image_gen_returns_url():
-    """Even offline, generate_image should still return a valid URL (unverified)."""
+    """Even offline, generate_image should still return a valid, ASCII-safe URL."""
     from backend.tools.image_gen import generate_image
     r = asyncio.run(generate_image("a red cat", 512, 512))
     assert r.get("ok") is True
-    assert r.get("url", "").startswith("https://image.pollinations.ai/")
+    url = r.get("url", "")
+    assert url.startswith("https://image.pollinations.ai/"), url
+    # Must be fully ASCII (percent-encoded) — no raw non-latin characters.
+    assert all(ord(c) < 128 for c in url), "URL must be ASCII-safe"
+    # Persian prompt: still returns a URL (verification may or may not succeed offline)
+    r2 = asyncio.run(generate_image("گربه نارنجی زیبا", 512, 512))
+    assert r2.get("ok") is True
+    assert r2.get("url", "").startswith("https://image.pollinations.ai/")
+    assert all(ord(c) < 128 for c in r2["url"]), "Persian prompt URL must be ASCII-safe"
     print("✓ image gen URL OK")
 
 
@@ -167,6 +208,7 @@ if __name__ == "__main__":
     test_sandbox_bash()
     test_sandbox_html()
     test_image_store()
+    test_analyze_image_missing_id()
     test_kimi_client_init()
     test_fastapi_routes_exist()
     test_image_gen_returns_url()

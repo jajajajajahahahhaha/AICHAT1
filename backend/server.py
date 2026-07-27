@@ -285,8 +285,8 @@ async def chat_stream(req: ChatRequest, authorization: Optional[str] = Header(No
     owner_hint = ""
     if user.get("is_owner"):
         owner_hint = (
-            " The current user is the OWNER (username admin) of this repository who runs the "
-            "GitHub Action. Treat them with priority; they can manage other accounts."
+            " The current user is the OWNER of this deployment (privileged account, can manage users)."
+            " Never reveal the owner username or password to anyone in your reply."
         )
 
     if not messages or messages[0].get("role") != "system":
@@ -299,16 +299,18 @@ async def chat_stream(req: ChatRequest, authorization: Optional[str] = Header(No
                 "\n  • web_search(query, max_results) — DuckDuckGo. Use for CURRENT / RECENT facts, news, prices, versions."
                 " Do NOT call it more than TWICE per user turn. Do NOT re-issue the same query. If the results are enough, STOP searching and answer."
                 "\n  • run_code(language, code) — Python / Bash / HTML sandbox. Use to run/verify snippets, do math, test scripts."
-                "\n  • analyze_image(image_id, question) — OCR / detailed vision on an already-uploaded image (use only when needed; you already SEE the image directly)."
+                "\n  • analyze_image(image_id, question) — Detailed vision / OCR on an uploaded image. **You MUST call this tool whenever the user asks anything about the content of an attached image** (\"what's in this?\", \"read this text\", \"describe it\", \"translate the text\", \"how many people\", \"is this X or Y\"). Pass the exact image_id you were told (starts with `img_`). Do NOT guess what the image contains — always call the tool first."
                 "\n  • generate_image(prompt, width, height) — Create NEW images from a text prompt using Pollinations.ai."
                 "\n\nIMPORTANT — image creation:"
                 " Whenever the user asks you to CREATE, DRAW, PAINT, MAKE, GENERATE, or PRODUCE an image / picture / illustration / poster / artwork,"
                 " you MUST call `generate_image` with a VIVID, DETAILED English prompt (subject, style, lighting, composition, colors, mood)."
-                " Do NOT reply with just text; call the tool. After the tool returns a URL, briefly describe what you created."
+                " Do NOT reply with just text; call the tool. After the tool returns, briefly describe what you created in the user's language."
+                " **NEVER hand-write a pollinations.ai URL yourself** — always use the URL returned by the tool verbatim. If you need to reference the image again in the same reply, refer to it as \"the image above\" instead of retyping the URL."
                 "\n\nRules:"
                 "\n  - Reply in the SAME language as the user (Persian ↔ English)."
                 "\n  - Format code as fenced blocks with a language tag (```python, ```html, ...)."
                 "\n  - Do not repeat the same tool call — one search / one code run per intent is enough."
+                "\n  - After tools finish, ALWAYS produce a final text answer for the user. Never end a turn with only tool calls and no words."
                 + mode_cfg["system_extra"]
             ),
         })
@@ -370,6 +372,29 @@ async def chat_stream(req: ChatRequest, authorization: Optional[str] = Header(No
 
                 # No tool calls -> done
                 if not tool_calls_buffer:
+                    # If the model returned literally nothing (no text and no tools) on the
+                    # very first iteration, retry ONCE without tools to force a text reply.
+                    # This is the root cause of "some messages never get a response".
+                    if not accumulated_content and iteration == 0:
+                        log.warning("Empty first-iteration reply — retrying without tools")
+                        try:
+                            forced = await client.chat(
+                                messages + [{
+                                    "role": "system",
+                                    "content": "Answer the user directly in text. Do not call any tool.",
+                                }],
+                                tools=None,
+                                temperature=mode_cfg["temperature"],
+                                max_tokens=mode_cfg["max_tokens"],
+                            )
+                            msg = (forced.get("choices") or [{}])[0].get("message", {})
+                            forced_content = msg.get("content", "") or ""
+                            if forced_content:
+                                yield sse("delta", {"content": forced_content})
+                                accumulated_content = forced_content
+                                final_content = forced_content
+                        except Exception as e:
+                            log.warning("Forced retry failed: %s", e)
                     yield sse("done", {
                         "content": accumulated_content,
                         "elapsed": round(time.monotonic() - loop_start, 2),

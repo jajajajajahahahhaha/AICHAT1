@@ -1,22 +1,16 @@
-# Kimi Chat — v2.1
+# Kimi Chat — v2.2
 
 A polished ChatGPT-like AI chat interface running on **GitHub Actions**, powered by **Kimi K2.6** via a Cloudflare Worker proxy.
 
-## ✨ What changed in v2.1 (bugfix release)
+## ✨ What's new in v2.2 (bug-fix + polish release)
 
-Every issue you reported is fixed:
+Every issue reported in v2.1 is fixed:
 
-- ✅ **Second / later messages no longer freeze on "Thinking…"** — the streaming state is fully cleared between turns and rebuilt from a single source of truth.
-- ✅ **Chats load correctly** — clicking a chat in the sidebar now rebuilds the whole DOM (welcome / previous messages / tool events / generated images).
-- ✅ **All code blocks are copyable** — the code-block enhancer is idempotent; it re-runs on every stream update so blocks emitted mid-stream still get a Copy button.
-- ✅ **Web search no longer loops 50 times** — server-side dedupe by tool signature + `max_iterations=4` + explicit system-prompt guidance. Same query is answered with "you already ran this — produce your final answer".
-- ✅ **Image generation actually happens** — dedicated `generate_image` tool, verified in a **separate worker process** (per your ask). Model gets a very explicit instruction to call the tool for any "create/draw/make an image" request.
-- ✅ **Image upload is recognised** — uploaded images are now persisted to disk (not just an in-memory dict), and are re-hydrated on server start.
-- ✅ **File upload** works for PDF, TXT, MD, CSV, JSON, and all common code files.
-- ✅ **UI is softer** — refined spacing, colours, radii, transitions, focus rings; icon-only edit/copy buttons under every message; better sidebar highlight; cleaner code blocks; toast notifications.
-- ✅ **Accounts** — register form on `/login`, owner `admin` / `admin` gets a Manage-Users panel with delete permission.
-- ✅ **Modes** — `Lite` / `Fast` / `Thinking` switch in the top bar.
-- ✅ **HTML `Run` opens in a sandboxed iframe modal only** — never pollutes the current page.
+- ✅ **"Some messages get no answer" bug** — the frontend now guarantees strict `user`/`assistant` alternation before hitting the model, and the backend falls back to a forced text reply if the model tries to end a turn with no output.
+- ✅ **Broken image URL** — generation now percent-encodes the whole prompt (including Persian), drops the flaky `enhance=true` flag, retries on 404, and auto-falls back to a safe English prompt when a non-ASCII one won't render. The frontend also re-tries the `<img>` twice with a small back-off, and if it still fails shows a clickable "open directly" link instead of a broken-icon.
+- ✅ **`analyze_image` tool actually works** — the system prompt now REQUIRES calling it whenever the user asks about an attached image, and the tool lazily rehydrates images from disk so a restart between upload and analyze doesn't kill it.
+- ✅ **UI is noticeably softer** — new indigo/violet palette, gradient send button with shadow, gentler easing curves, subtle hover translations on chat items / cards, an animated placeholder box while an image loads.
+- ✅ **Owner account hardened** — username is now `ADMIN` (fixed, reserved), password is read at startup from the `OWNER_PASS` secret, and the login page no longer advertises the credentials. Legacy `admin` records auto-migrate.
 
 ## 🚀 Setup
 
@@ -24,7 +18,7 @@ Every issue you reported is fixed:
 
 The upstream inference API sits behind Cloudflare bot protection. The included Worker in `proxy/` runs inside Cloudflare's own network, bypassing the challenge.
 
-Already deployed for this project at: `https://kimi-proxy.abol89898.workers.dev/v1`
+Already deployed at: `https://kimi-proxy.abol89898.workers.dev/v1`
 
 ### 2. GitHub Secrets
 
@@ -37,10 +31,14 @@ Repo → **Settings → Secrets and variables → Actions → New repository sec
 | `KIMI_MODEL`    | `moonshotai/Kimi-K2.6`                                                       |
 | `GH_TOKEN`      | Personal Access Token with `repo` scope (used for auto-committing chats)     |
 | `GH_USERNAME`   | Your GitHub username                                                         |
+| `OWNER_PASS`    | Password for the owner account (`ADMIN`). Keep this secret.                  |
 
 ### 3. Run
 
-**Actions → Run Kimi Chat Server → Run workflow.** After ~1 minute a temporary Cloudflare Tunnel URL is printed in the job summary. Open it in a browser and log in with `admin` / `admin` (or register a new account).
+**Actions → Run Kimi Chat Server → Run workflow.** After ~1 minute a temporary Cloudflare Tunnel URL is printed in the job summary. Open it in a browser and either:
+
+- **Register** a new account from the sign-up tab, or
+- **Log in** as the owner with username `ADMIN` and the password you set in the `OWNER_PASS` secret (the credentials are never shown on the login page).
 
 ## 🧰 Tools the model can call
 
@@ -69,10 +67,10 @@ FastAPI backend (backend/server.py)
 ## 🧪 Tests
 
 ```bash
-python3 tests/test_all.py
+OWNER_PASS=test_owner_pw_123 python3 tests/test_all.py
 ```
 
-Covers: auth, tool-signature dedupe, DDG search wrapper, sandbox (Python/Bash/HTML), image store, Kimi client init, all FastAPI routes, image-gen URL, tool definitions. All eleven tests pass.
+Covers: auth (incl. reserved-name + case-insensitive login), tool-signature dedupe, DDG search wrapper, sandbox (Python/Bash/HTML), image store, `analyze_image` missing-id, Kimi client init, all FastAPI routes, image-gen URL (ASCII-safe for Persian prompts too), tool definitions. All twelve tests pass.
 
 ## 🔧 Local development
 
@@ -81,6 +79,7 @@ pip install -r backend/requirements.txt
 export KIMI_API_KEY="..."
 export KIMI_BASE_URL="https://kimi-proxy.abol89898.workers.dev/v1"
 export KIMI_MODEL="moonshotai/Kimi-K2.6"
+export OWNER_PASS="pick-something-strong"
 python3 backend/server.py     # → http://127.0.0.1:7860
 ```
 

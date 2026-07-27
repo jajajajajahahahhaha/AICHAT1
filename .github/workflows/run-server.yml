@@ -25,6 +25,7 @@ jobs:
       KIMI_MODEL:    ${{ secrets.KIMI_MODEL }}
       GH_TOKEN:      ${{ secrets.GH_TOKEN }}
       GH_USERNAME:   ${{ secrets.GH_USERNAME }}
+      OWNER_PASS:    ${{ secrets.OWNER_PASS }}
       PORT: "7860"
 
     steps:
@@ -52,11 +53,14 @@ jobs:
           [ -z "$KIMI_API_KEY"  ] && missing+=("KIMI_API_KEY")
           [ -z "$KIMI_BASE_URL" ] && missing+=("KIMI_BASE_URL")
           [ -z "$KIMI_MODEL"    ] && missing+=("KIMI_MODEL")
+          [ -z "$OWNER_PASS"    ] && missing+=("OWNER_PASS")
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Missing required secrets: ${missing[*]}"
             exit 1
           fi
           echo "All required secrets present."
+
+          # Do NOT print owner credentials — they are hidden from the login page on purpose.
 
       - name: Install cloudflared
         run: |
@@ -135,16 +139,15 @@ jobs:
           echo "  🎉 Kimi Chat is running!"
           echo "  🌐 Open this URL in your browser:"
           echo "     ${{ env.PUBLIC_URL }}"
-          echo "  🔐 Owner login: admin / admin"
+          echo "  🔐 Log in with your own account (or the owner account — credentials are private)."
           echo "================================================================"
           {
             echo "## 🤖 Kimi Chat is live"
             echo ""
             echo "**Public URL:** ${{ env.PUBLIC_URL }}"
             echo ""
-            echo "**Owner Login:** \`admin\` / \`admin\`"
+            echo "Register a new account or log in with the private owner credentials (kept in \`OWNER_PASS\` secret)."
             echo ""
-            echo "Open the URL above in your browser and log in to start chatting."
             echo "The URL is temporary and changes every workflow run."
           } >> $GITHUB_STEP_SUMMARY
 

@@ -628,12 +628,7 @@ function renderMessage(msg, index) {
 
     // Historic generated images
     (msg.generated_images || []).forEach((img) => {
-      const imgEl = document.createElement("img");
-      imgEl.className = "generated-image";
-      imgEl.src = img.url;
-      imgEl.alt = img.prompt || "";
-      imgEl.addEventListener("click", () => openImageModal(img.url));
-      strip.appendChild(imgEl);
+      mountGeneratedImage(strip, img.url, img.prompt || "");
     });
 
     if (msg.content) {
@@ -652,6 +647,49 @@ function renderMessage(msg, index) {
     });
     return block;
   }
+}
+
+/**
+ * Insert a generated <img> into `container` with graceful retry+fallback so
+ * the user never sees a permanent broken-image icon:
+ *   * On error, retry the same URL up to 2 times with a short backoff
+ *     (Pollinations is lazy — the very first request can 404 while it renders).
+ *   * If still broken, mark the element and show a click-to-reload hint.
+ */
+function mountGeneratedImage(container, url, prompt) {
+  const img = document.createElement("img");
+  img.className = "generated-image";
+  img.alt = prompt || "";
+  img.loading = "lazy";
+  img.decoding = "async";
+  img.dataset.originalUrl = url;
+  let attempts = 0;
+  const maxRetries = 2;
+  const load = (u) => { img.src = u; };
+  img.addEventListener("error", () => {
+    attempts += 1;
+    if (attempts <= maxRetries) {
+      const delay = 900 * attempts;
+      setTimeout(() => {
+        const sep = url.includes("?") ? "&" : "?";
+        load(url + sep + "_r=" + Date.now());
+      }, delay);
+    } else {
+      img.dataset.broken = "1";
+      img.removeAttribute("src");
+      img.style.display = "flex";
+      img.textContent = "";
+      const box = document.createElement("div");
+      box.className = "generated-image";
+      box.dataset.broken = "1";
+      box.innerHTML = `⚠️ Couldn’t load image — <a href="${escapeHtml(url)}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline;margin-inline-start:6px">open directly</a>`;
+      img.replaceWith(box);
+    }
+  });
+  img.addEventListener("click", () => openImageModal(img.src || url));
+  container.appendChild(img);
+  load(url);
+  return img;
 }
 
 function toolLabel(name) {
@@ -812,20 +850,50 @@ async function streamAssistantResponse() {
   updateSendBtn();
   state.abortController = new AbortController();
 
-  // Build clean API messages from state (excluding the trailing in-progress assistant)
+  // Build clean API messages from state (excluding the trailing in-progress assistant).
+  //
+  // Critical fix (v2.2): previously we dropped assistant turns that had no text
+  // (e.g. the model only called a tool then died mid-turn). That left orphan
+  // `user`->`user` sequences in the transcript, which is the root cause of the
+  // "some messages get no answer" bug reported by users. We now substitute a
+  // placeholder assistant reply when the previous turn ended without any text,
+  // so every user turn is properly paired with an assistant turn.
   const apiMessages = [];
   const attachedImageIds = [];
+  const lastUserIdx = (() => {
+    for (let i = state.messages.length - 1; i >= 0; i--) {
+      if (i === asstIndex) continue;
+      if (state.messages[i].role === "user") return i;
+    }
+    return -1;
+  })();
+  let lastPushedRole = null;
   for (let i = 0; i < state.messages.length; i++) {
     const m = state.messages[i];
     if (i === asstIndex) continue;                       // skip in-progress assistant
     if (m.role === "user") {
+      // If the previous message we pushed was also a user, insert a stub assistant
+      // reply to keep strict user/assistant alternation for the upstream model.
+      if (lastPushedRole === "user") {
+        apiMessages.push({ role: "assistant", content: "(ok)" });
+      }
       apiMessages.push({ role: "user", content: m.content });
-      // Only the LAST user message (right before asstIndex) attaches images
-      if (i === asstIndex - 1 && m.image_ids && m.image_ids.length) {
+      lastPushedRole = "user";
+      // Only the MOST RECENT user message attaches images
+      if (i === lastUserIdx && m.image_ids && m.image_ids.length) {
         attachedImageIds.push(...m.image_ids);
       }
     } else if (m.role === "assistant") {
-      if (m.content) apiMessages.push({ role: "assistant", content: m.content });
+      if (m.content) {
+        apiMessages.push({ role: "assistant", content: m.content });
+        lastPushedRole = "assistant";
+      } else if (lastPushedRole === "user") {
+        // Empty assistant (tool-only turn) — emit a minimal placeholder so the
+        // strict-alternation invariant holds. Without this the next user turn
+        // would be silently dropped by strict backends.
+        apiMessages.push({ role: "assistant", content: "(tool call only)" });
+        lastPushedRole = "assistant";
+      }
     }
   }
 
@@ -899,12 +967,7 @@ async function streamAssistantResponse() {
         } else if (eventName === "image_generated") {
           gotAnything = true;
           removeThinking();
-          const imgEl = document.createElement("img");
-          imgEl.className = "generated-image";
-          imgEl.src = data.url;
-          imgEl.alt = data.prompt || "";
-          imgEl.addEventListener("click", () => openImageModal(data.url));
-          strip.appendChild(imgEl);
+          const imgEl = mountGeneratedImage(strip, data.url, data.prompt || "");
           asstMsg.generated_images.push({ url: data.url, prompt: data.prompt });
         } else if (eventName === "done") {
           gotAnything = true;
