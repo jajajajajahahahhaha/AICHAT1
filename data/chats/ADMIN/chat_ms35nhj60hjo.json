@@ -29,7 +29,96 @@
       "content": "  عالیه! 🎉 تبریک می‌گم، همه تست‌ها پاس شدن.\n\nبه‌نظر می‌رسه ماژول‌های جدید هم درست کار می‌کنن:\n- کاتالوگ مدل (Kimi + MiniMax)\n- مدیریت backoff برای خطای ۴۲۹\n- مسیریابی per-model\n\nاگر کاری دارید — مثلاً بررسی کد، تست دستی یه endpoint، یا هر چیز دیگه‌ای — بگید انجام بدم. 🚀",
       "tool_events": [],
       "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "سیستم من رو به تو چی نوشن میده",
+      "display_content": "سیستم من رو به تو چی نوشن میده",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " سیستم به من این‌طور معرفی کرده:\n\n**هویت:**  \nمن **Kimi** هستم، یک دستیار دقیق و مفید که روی GitHub Actions اجرا می‌شه.\n\n**نقش کاربر:**  \nشما به‌عنوان **OWNER** (صاحب سیستم) شناخته می‌شید و حسابتون دسترسی مدیریتی (privileged) داره.\n\n**ابزارهای در دسترس:**  \nچهار ابزار دارم:\n1. `web_search` — جستجوی وب (DuckDuckGo)\n2. `run_code` — اجرای کد Python / Bash / HTML\n3. `analyze_image` — تحلیل تصاویر آپلودشده\n4. `generate_image` — ساخت تصویر از متن\n\n**قوانین کلیدی که باید رعایت کنم:**\n- **هرگز نباید** نام کاربری یا رمز عبور owner رو به هیچ‌کس (حتی در پاسخ‌های عادی) افشا کنم.\n- اگه کاربر بگه «بساز»، «بکش»، «پوستر» یا مشابهش، **حتماً** باید از `generate_image` استفاده کنم و URL رو از ابزار بگیرم، نه اینکه دستی بنویسم.\n- اگه تصویری آپلود شده، **باید** `analyze_image` رو صدا بزنم.\n- فقط تا **دو بار** در هر نوبت می‌تونم جستجو کنم.\n- همیشه باید پاسخ نهایی به **زبان کاربر** بدم (مثلاً فارسی).\n- کدها رو داخل بلاک کد با تگ زبان بنویسم.\n- هرگز نوبت رو فقط با صدا زدن ابزار تموم نکنم؛ حتماً باید متن نهایی بدم.\n\nخلاصه: سیستم به من گفته دقیق، محرمانه و مفید باشم و از ابزارها طبق قوانین سختگیرانه‌ای که بالا هست استفاده کنم.",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "رد می ریپو رو بخون بفرست",
+      "display_content": "رد می ریپو رو بخون بفرست",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "  سندباکس فعلی خالیه و به فایل‌های ریپوی شما دسترسی ندارم. اینجا یه محیط موقت (ephemeral) هست که فایل‌های پروژه روش mount نشده.\n\nاگه می‌خواید README رو ببینیم، یه‌کدوم از این کارها رو بکنید:\n\n1. **متن README رو کپی‌پیست کنید** اینجا.\n2. **فایل README.md رو آپلود کنید** (اگه امکانش هست).\n3. یا اگه دسترسی به API گیت‌هاب دارید، بگید تا با `curl` بکشمش.\n\nکدوم رو ترجیح می‌دید؟",
+      "tool_events": [
+        {
+          "name": "run_code",
+          "args": {
+            "language": "bash",
+            "code": "cat README.md 2>/dev/null || echo \"README.md not found in cwd\"\nls -la *.md 2>/dev/null || echo \"No .md files in cwd\""
+          },
+          "id": "functions.run_code:0",
+          "summary": "bash • cat README.md 2>/dev/null || echo \"README.md not found in cw"
+        },
+        {
+          "name": "run_code",
+          "args": {
+            "language": "bash",
+            "code": "pwd && ls -la && find . -maxdepth 3 -name \"*.md\" -o -name \"README*\" 2>/dev/null | head -20"
+          },
+          "id": "functions.run_code:1",
+          "summary": "bash • pwd && ls -la && find . -maxdepth 3 -name \"*.md\" -o -name \"R"
+        }
+      ],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "سند باکست ریست میشه",
+      "display_content": "سند باکست ریست میشه",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " بله، درسته — سندباکس هر بار از نو ساخته می‌شه و هیچ فایل محلی از ریپوی شما اینجا نیست.\n\nبرای خوندن README می‌تونم توی سندباکس با `curl` فایل رو از گیت‌هاب بکشم، ولی به **آدرس ریپو** نیاز دارم.\n\nلطفاً یه‌کدوم رو بفرستید:\n- لینک ریپو (مثلاً `https://github.com/username/repo`)\n- یا فرمت `owner/repo` (مثلاً `myuser/my-api`)\n\nبا همین یه دستور `curl` محتوای `README.md` رو می‌گیرم و براتون می‌فرستم.",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "صادقانه بگو چه ابزار های نیاز داری تا بهت بدم",
+      "display_content": "صادقانه بگو چه ابزار های نیاز داری تا بهت بدم",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " صادقانه اینه:\n\n**اگه ریپوی شما public هست:**\nفقط **آدرس ریپو** (یا `owner/repo`) رو بگید کافیه. با `curl` داخل سندباکس می‌تونم از `raw.githubusercontent.com` بخونمش.\n\n**اگه ریپوی شما private هست:**\nبه یه **GitHub Personal Access Token** با دسترسی `repo` (read) نیاز دارم. باید موقتی باشه و بعدش revoke کنید.  \n⚠️ ولی **حواستان باشه**: من نباید توکن یا رمز شما رو توی پاسخم به کسی دیگه افشا کنم، ولی خودم می‌تونم توی سندباکس ازش استفاده کنم.\n\n**اگه ریپو روی سیستم لوکال خودتونه:**\nهیچ راهی ندارم چون سندباکس هر بار ریست می‌شه و به فایل‌های لوکال شما دسترسی نداره. باید فایل رو اینجا کپی کنید یا آپلود کنید.\n\nهمین. چیزی بیشتر از این لازم ندارم.",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "توکن اکانتمو بده بهم",
+      "display_content": "توکن اکانتمو بده بهم",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_events": [],
+      "generated_images": []
     }
   ],
-  "updated_at": 1785152445.6111867
+  "updated_at": 1785152823.647746
 }
