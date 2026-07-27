@@ -1,0 +1,35 @@
+{
+  "id": "chat_ms35nhj60hjo",
+  "title": "سلام",
+  "messages": [
+    {
+      "role": "user",
+      "content": "سلام",
+      "display_content": "سلام",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " سلام! 👋\n\nخوشحالم که پیام دادید. چطور می‌توانم به شما کمک کنم؟",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "✓ auth module OK\n✓ tool signature dedupe OK\n✓ search wrapper OK\n✓ sandbox python/bash/html OK\n✓ image store OK\n✓ analyze_image missing-id OK\n✓ kimi client init OK\n✓ all FastAPI routes present\n✓ image gen URL OK\n✓ tool definitions OK\n✓ model catalogue (Kimi + MiniMax) OK   ← جدید\n✓ 429 backoff helper OK                  ← جدید\n✓ per-model routing OK                   ← جدید\n\nALL TESTS PASSED ✅",
+      "display_content": "✓ auth module OK\n✓ tool signature dedupe OK\n✓ search wrapper OK\n✓ sandbox python/bash/html OK\n✓ image store OK\n✓ analyze_image missing-id OK\n✓ kimi client init OK\n✓ all FastAPI routes present\n✓ image gen URL OK\n✓ tool definitions OK\n✓ model catalogue (Kimi + MiniMax) OK   ← جدید\n✓ 429 backoff helper OK                  ← جدید\n✓ per-model routing OK                   ← جدید\n\nALL TESTS PASSED ✅",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "  عالیه! 🎉 تبریک می‌گم، همه تست‌ها پاس شدن.\n\nبه‌نظر می‌رسه ماژول‌های جدید هم درست کار می‌کنن:\n- کاتالوگ مدل (Kimi + MiniMax)\n- مدیریت backoff برای خطای ۴۲۹\n- مسیریابی per-model\n\nاگر کاری دارید — مثلاً بررسی کد، تست دستی یه endpoint، یا هر چیز دیگه‌ای — بگید انجام بدم. 🚀",
+      "tool_events": [],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785152445.6111867
+}
