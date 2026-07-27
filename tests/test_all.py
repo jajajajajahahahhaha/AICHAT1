@@ -200,6 +200,48 @@ def test_tool_definitions_shape():
     print("✓ tool definitions OK")
 
 
+def test_available_models_has_kimi_and_minimax():
+    """v2.3 — both Kimi K2.6 and MiniMax M2.7 must be selectable."""
+    from backend.kimi_client import AVAILABLE_MODELS
+    ids = {m["id"] for m in AVAILABLE_MODELS}
+    assert "moonshotai/Kimi-K2.6" in ids
+    assert "MiniMaxAI/MiniMax-M2.7" in ids
+    # Both are vision-capable and carry an explicit provider tag for routing
+    for m in AVAILABLE_MODELS:
+        assert "provider" in m and m["provider"] in ("kimi", "minimax")
+        assert m.get("vision") is True
+    print("✓ model catalogue (Kimi + MiniMax) OK")
+
+
+def test_backoff_helper_429_grows():
+    """429 backoff must grow with attempt count and respect Retry-After."""
+    from backend.kimi_client import _backoff_delay
+    d1 = _backoff_delay(1, 429, None)
+    d2 = _backoff_delay(2, 429, None)
+    d3 = _backoff_delay(3, 429, None)
+    # Lower bounds (without jitter) grow: 2, 4, 8
+    assert d1 >= 2.0 and d2 >= 4.0 and d3 >= 8.0, (d1, d2, d3)
+    # Retry-After (when provided) is honoured and clamped
+    assert _backoff_delay(5, 429, 3.0) == 3.0
+    assert _backoff_delay(5, 429, 999.0) == 20.0  # clamp
+    print("✓ 429 backoff helper OK")
+
+
+def test_client_routes_minimax_separately():
+    """Client must route MiniMax requests to the MiniMax base URL / key."""
+    import importlib
+    from backend import kimi_client as _kc
+    importlib.reload(_kc)
+    c = _kc.KimiClient()
+    r_kimi = c._route_for("moonshotai/Kimi-K2.6")
+    r_minimax = c._route_for("MiniMaxAI/MiniMax-M2.7")
+    assert r_kimi["base_url"].endswith("/v1")
+    assert r_minimax["base_url"].endswith("/v1")
+    # Both have a usable API key (falls back to KIMI_API_KEY when MINIMAX_API_KEY unset)
+    assert r_kimi["api_key"] and r_minimax["api_key"]
+    print("✓ per-model routing OK")
+
+
 if __name__ == "__main__":
     test_auth_module()
     test_tools_signature_dedup()
@@ -213,4 +255,7 @@ if __name__ == "__main__":
     test_fastapi_routes_exist()
     test_image_gen_returns_url()
     test_tool_definitions_shape()
+    test_available_models_has_kimi_and_minimax()
+    test_backoff_helper_429_grows()
+    test_client_routes_minimax_separately()
     print("\nALL TESTS PASSED ✅")

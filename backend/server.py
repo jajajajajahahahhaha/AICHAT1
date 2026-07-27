@@ -1,5 +1,11 @@
 """
-Kimi Chat Server — FastAPI backend (v2.1)
+Kimi Chat Server — FastAPI backend (v2.3)
+
+v2.3:
+  * Multi-model routing: Kimi K2.6 + MiniMax M2.7 (switchable per request)
+  * Robust 429 handling (retry with exponential backoff — see kimi_client)
+  * analyze_image respects the caller's currently-selected model, and falls
+    back to a vision-capable one if the chosen model can't see images.
 """
 import os
 import sys
@@ -176,15 +182,22 @@ async def api_delete_user(username: str, authorization: Optional[str] = Header(N
 
 
 # ---------- Tool executor ----------
-async def execute_tool(name: str, args: Dict[str, Any]) -> Dict[str, Any]:
-    log.info(f"[TOOL] {name} args_keys={list(args.keys())}")
+async def execute_tool(name: str, args: Dict[str, Any], *, model: Optional[str] = None) -> Dict[str, Any]:
+    log.info(f"[TOOL] {name} args_keys={list(args.keys())} model={model}")
     try:
         if name == "web_search":
             return await web_search(args.get("query", ""), int(args.get("max_results", 5)))
         if name == "run_code":
             return await run_code(args.get("language", "python"), args.get("code", ""))
         if name == "analyze_image":
-            return await analyze_image(args.get("image_id", ""), args.get("question", ""))
+            # Pass through the currently-selected model so vision picks the
+            # right route (Kimi vs MiniMax) and auto-falls-back to a
+            # vision-capable model if the caller's model can't see images.
+            return await analyze_image(
+                args.get("image_id", ""),
+                args.get("question", ""),
+                model=model,
+            )
         if name == "generate_image":
             return await generate_image(
                 args.get("prompt", ""),
@@ -434,7 +447,7 @@ async def chat_stream(req: ChatRequest, authorization: Optional[str] = Header(No
                         continue
 
                     yield sse("tool_call", {"id": tc["id"], "name": fn_name, "args": fn_args})
-                    result = await execute_tool(fn_name, fn_args)
+                    result = await execute_tool(fn_name, fn_args, model=client.model)
                     yield sse("tool_result", {"id": tc["id"], "name": fn_name, "result": result})
 
                     if fn_name == "generate_image" and result.get("ok") and result.get("url"):

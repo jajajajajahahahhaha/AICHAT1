@@ -1,17 +1,20 @@
 """
-Image understanding tool - uses Kimi K2.6 with image input.
+Image understanding tool — uses the currently-selected model (Kimi or MiniMax)
+with image input.
 
-v2.2 fixes:
-  * If the model calls analyze_image with a bad / stale image_id, we now
-    try to locate the image on disk (rehydrate lazily) BEFORE giving up,
-    so a restart between upload and analyze doesn't break the tool.
-  * The tool no longer instantiates a brand-new KimiClient on every call
-    (the API key is read once).
-  * A clearer, structured result payload — {success, analysis, image_id,
-    error} — so the model can react to a failure properly instead of
-    swallowing an opaque error string.
-  * If the vision call itself errors we surface the actual message so
-    the user sees WHY (e.g. quota / auth), rather than a silent fail.
+v2.3 fixes
+----------
+  * `analyze_image` now accepts a `model` argument so the caller's currently
+    selected model (Kimi K2.6 / MiniMax M2.7) is used for vision. Previously
+    the tool implicitly used whatever `KIMI_MODEL` env var pointed at, which
+    silently broke when the user switched models in the UI.
+  * The client's `vision()` helper auto-falls-back to a vision-capable model
+    if the selected one is text-only — so switching models never makes image
+    analysis go dark.
+  * Lazy on-disk rehydrate (unchanged) so a restart between upload and analyze
+    doesn't lose the picture.
+  * Errors surface the real upstream message (status + body) instead of a
+    generic silent failure.
 """
 import base64
 import logging
@@ -59,8 +62,8 @@ def _lazy_load_from_disk(image_id: str) -> Optional[Dict[str, str]]:
     return None
 
 
-async def analyze_image(image_id: str, question: str) -> Dict[str, Any]:
-    """Analyze a previously uploaded image with Kimi Vision."""
+async def analyze_image(image_id: str, question: str, *, model: Optional[str] = None) -> Dict[str, Any]:
+    """Analyze a previously uploaded image using the selected model's vision endpoint."""
     from ..kimi_client import KimiClient, KimiAPIError  # lazy import
 
     image_id = (image_id or "").strip()
@@ -80,7 +83,7 @@ async def analyze_image(image_id: str, question: str) -> Dict[str, Any]:
         }
 
     try:
-        client = KimiClient()
+        client = KimiClient(model=model) if model else KimiClient()
     except Exception as e:
         return {
             "success": False,
@@ -90,7 +93,7 @@ async def analyze_image(image_id: str, question: str) -> Dict[str, Any]:
 
     try:
         answer = await client.vision(
-            img["b64"], question, mime=img.get("mime", "image/png")
+            img["b64"], question, mime=img.get("mime", "image/png"), model=model
         )
         # `vision()` catches its own errors and returns them as a string that
         # starts with '[Vision error'. Detect that and route through error field.
@@ -104,13 +107,14 @@ async def analyze_image(image_id: str, question: str) -> Dict[str, Any]:
             "success": True,
             "image_id": image_id,
             "question": question,
+            "model": client.model,
             "analysis": answer,
         }
     except KimiAPIError as e:
         return {
             "success": False,
             "image_id": image_id,
-            "error": f"Kimi API error {e.status}: {e.body[:300]}",
+            "error": f"Vision API error {e.status}: {e.body[:300]}",
         }
     except Exception as e:
         log.exception("analyze_image failed")

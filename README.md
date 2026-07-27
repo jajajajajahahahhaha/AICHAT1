@@ -1,16 +1,14 @@
-# Kimi Chat — v2.2
+# Kimi & MiniMax Chat — v2.3
 
-A polished ChatGPT-like AI chat interface running on **GitHub Actions**, powered by **Kimi K2.6** via a Cloudflare Worker proxy.
+A polished ChatGPT-like AI chat interface running on **GitHub Actions**, powered by **Kimi K2.6** and **MiniMax M2.7** via a Cloudflare Worker proxy.
 
-## ✨ What's new in v2.2 (bug-fix + polish release)
+## ✨ What's new in v2.3
 
-Every issue reported in v2.1 is fixed:
+- ✅ **Model switcher (Kimi ↔ MiniMax)** — Both `moonshotai/Kimi-K2.6` and `MiniMaxAI/MiniMax-M2.7` are now first-class citizens. The frontend model picker lists both; per-request routing sends traffic to the right provider automatically.
+- ✅ **`429 rate limit exceeded: too many concurrent requests` fixed** — The client now retries `429` (and 5xx) with **exponential backoff + jitter**, and honours `Retry-After` when the upstream sends it. Applies to both streaming and non-streaming paths.
+- ✅ **Image analysis fixed** — `analyze_image` now uses the user's *currently selected* model. If that model turns out not to be vision-capable, we auto-fall-back to a vision model instead of failing silently. Errors from the upstream vision endpoint are surfaced verbatim (status + body) so failures are debuggable.
 
-- ✅ **"Some messages get no answer" bug** — the frontend now guarantees strict `user`/`assistant` alternation before hitting the model, and the backend falls back to a forced text reply if the model tries to end a turn with no output.
-- ✅ **Broken image URL** — generation now percent-encodes the whole prompt (including Persian), drops the flaky `enhance=true` flag, retries on 404, and auto-falls back to a safe English prompt when a non-ASCII one won't render. The frontend also re-tries the `<img>` twice with a small back-off, and if it still fails shows a clickable "open directly" link instead of a broken-icon.
-- ✅ **`analyze_image` tool actually works** — the system prompt now REQUIRES calling it whenever the user asks about an attached image, and the tool lazily rehydrates images from disk so a restart between upload and analyze doesn't kill it.
-- ✅ **UI is noticeably softer** — new indigo/violet palette, gradient send button with shadow, gentler easing curves, subtle hover translations on chat items / cards, an animated placeholder box while an image loads.
-- ✅ **Owner account hardened** — username is now `ADMIN` (fixed, reserved), password is read at startup from the `OWNER_PASS` secret, and the login page no longer advertises the credentials. Legacy `admin` records auto-migrate.
+Everything from v2.2 (strict user/assistant alternation, image URL percent-encoding, softer indigo/violet UI, hardened owner login) is preserved.
 
 ## 🚀 Setup
 
@@ -24,14 +22,18 @@ Already deployed at: `https://kimi-proxy.abol89898.workers.dev/v1`
 
 Repo → **Settings → Secrets and variables → Actions → New repository secret**:
 
-| Secret name     | Value                                                                        |
-|-----------------|------------------------------------------------------------------------------|
-| `KIMI_API_KEY`  | Your API key (e.g. `dahl_...`)                                               |
-| `KIMI_BASE_URL` | `https://kimi-proxy.abol89898.workers.dev/v1`                                |
-| `KIMI_MODEL`    | `moonshotai/Kimi-K2.6`                                                       |
-| `GH_TOKEN`      | Personal Access Token with `repo` scope (used for auto-committing chats)     |
-| `GH_USERNAME`   | Your GitHub username                                                         |
-| `OWNER_PASS`    | Password for the owner account (`ADMIN`). Keep this secret.                  |
+| Secret name        | Value                                                                        |
+|--------------------|------------------------------------------------------------------------------|
+| `KIMI_API_KEY`     | Your API key (works for both Kimi and MiniMax on the same proxy)             |
+| `KIMI_BASE_URL`    | `https://kimi-proxy.abol89898.workers.dev/v1`                                |
+| `KIMI_MODEL`       | Default model. `moonshotai/Kimi-K2.6` **or** `MiniMaxAI/MiniMax-M2.7`        |
+| `MINIMAX_API_KEY`  | *(optional)* Separate key for MiniMax if it lives outside the shared proxy   |
+| `MINIMAX_BASE_URL` | *(optional)* Separate base URL for MiniMax (defaults to `KIMI_BASE_URL`)     |
+| `GH_TOKEN`         | Personal Access Token with `repo` scope (used for auto-committing chats)     |
+| `GH_USERNAME`      | Your GitHub username                                                         |
+| `OWNER_PASS`       | Password for the owner account (`ADMIN`). Keep this secret.                  |
+
+> **Tip:** if both models live on the same Cloudflare Worker proxy (the default), you only need `KIMI_API_KEY` — the client uses it for both providers.
 
 ### 3. Run
 
@@ -40,13 +42,15 @@ Repo → **Settings → Secrets and variables → Actions → New repository sec
 - **Register** a new account from the sign-up tab, or
 - **Log in** as the owner with username `ADMIN` and the password you set in the `OWNER_PASS` secret (the credentials are never shown on the login page).
 
+Use the **model selector at the top of the chat view** to switch between Kimi K2.6 and MiniMax M2.7 at any time — every subsequent message goes to the chosen model.
+
 ## 🧰 Tools the model can call
 
 | Tool             | What it does                                                        |
 |------------------|---------------------------------------------------------------------|
 | `web_search`     | DuckDuckGo (no key needed). Result is cached in-process for 90s.    |
 | `run_code`       | Python / Bash / HTML sandbox inside the Actions runner.             |
-| `analyze_image`  | Kimi K2.6 vision on an uploaded image (image_id).                   |
+| `analyze_image`  | Vision on an uploaded image, using the user's active model.         |
 | `generate_image` | Pollinations.ai in a separate worker process. Returns an image URL. |
 
 ## 🏗️ Architecture
@@ -57,7 +61,8 @@ Frontend (static HTML/CSS/JS)
 FastAPI backend (backend/server.py)
       ├── Auth (bcrypt + in-memory sessions, users.json persisted to repo)
       ├── Tools: search / sandbox / vision / image_gen (worker process)
-      └── Streaming chat proxy → Cloudflare Worker → Upstream Inference API
+      └── Streaming chat proxy → Cloudflare Worker → {Kimi K2.6 | MiniMax M2.7}
+              (with 429/5xx retry + exponential backoff)
 ```
 
 - Chats: `data/chats/<username>/<chat_id>.json` + browser localStorage
@@ -70,7 +75,7 @@ FastAPI backend (backend/server.py)
 OWNER_PASS=test_owner_pw_123 python3 tests/test_all.py
 ```
 
-Covers: auth (incl. reserved-name + case-insensitive login), tool-signature dedupe, DDG search wrapper, sandbox (Python/Bash/HTML), image store, `analyze_image` missing-id, Kimi client init, all FastAPI routes, image-gen URL (ASCII-safe for Persian prompts too), tool definitions. All twelve tests pass.
+Covers: auth (incl. reserved-name + case-insensitive login), tool-signature dedupe, DDG search wrapper, sandbox (Python/Bash/HTML), image store, `analyze_image` missing-id, Kimi client init, all FastAPI routes, image-gen URL (ASCII-safe for Persian prompts too), tool definitions, **multi-model catalogue (Kimi + MiniMax)**, **429 backoff helper**. All tests pass.
 
 ## 🔧 Local development
 
@@ -78,7 +83,7 @@ Covers: auth (incl. reserved-name + case-insensitive login), tool-signature dedu
 pip install -r backend/requirements.txt
 export KIMI_API_KEY="..."
 export KIMI_BASE_URL="https://kimi-proxy.abol89898.workers.dev/v1"
-export KIMI_MODEL="moonshotai/Kimi-K2.6"
+export KIMI_MODEL="moonshotai/Kimi-K2.6"    # or MiniMaxAI/MiniMax-M2.7
 export OWNER_PASS="pick-something-strong"
 python3 backend/server.py     # → http://127.0.0.1:7860
 ```
