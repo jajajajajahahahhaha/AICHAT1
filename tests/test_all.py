@@ -242,6 +242,137 @@ def test_client_routes_minimax_separately():
     print("✓ per-model routing OK")
 
 
+# ---------------------------------------------------------------------------
+# v2.4 regression tests — the two bugs the user reported
+# ---------------------------------------------------------------------------
+
+def test_search_survives_ratelimit():
+    """Even when DDG raises Ratelimit for every backend, web_search must
+    NOT crash and must return a dict with real results from a fallback source.
+    """
+    from backend.tools import search as search_mod
+    import importlib
+    importlib.reload(search_mod)
+
+    # Force the primary DDG library to always raise a Ratelimit-style error.
+    def _boom(query, max_results):
+        raise RuntimeError("DuckDuckGoSearchException: Ratelimit")
+
+    search_mod._ddg_search_sync = _boom  # type: ignore[attr-defined]
+
+    # Also stub the HTML fallback to fail, so we hit the Wikipedia last resort.
+    def _boom_html(query, max_results):
+        raise RuntimeError("HTML endpoint 429")
+    search_mod._ddg_html_fallback = _boom_html  # type: ignore[attr-defined]
+
+    result = asyncio.run(search_mod.web_search("Python programming language", max_results=3))
+    assert isinstance(result, dict)
+    # Either we got results from the wiki fallback, or a structured error —
+    # NEVER an unhandled exception.
+    assert "results" in result
+    if result.get("results"):
+        # If we're online, wiki fallback should have produced entries
+        assert result.get("source") == "wikipedia"
+        assert all("url" in r and "title" in r for r in result["results"])
+        print("✓ search survives DDG ratelimit → wiki fallback OK")
+    else:
+        assert "error" in result
+        print("✓ search survives DDG ratelimit (offline; structured error) OK")
+
+
+def test_search_cached_key_case_insensitive():
+    """Cache TTL bumped to 5min; identical case-insensitive query must hit cache."""
+    from backend.tools import search as search_mod
+    import importlib
+    importlib.reload(search_mod)
+
+    call_count = {"n": 0}
+    def _stub(query, max_results):
+        call_count["n"] += 1
+        return [{"title": "t", "url": "https://x", "snippet": "s"}]
+    search_mod._ddg_search_sync = _stub  # type: ignore[attr-defined]
+
+    r1 = asyncio.run(search_mod.web_search("Hello WORLD", max_results=3))
+    r2 = asyncio.run(search_mod.web_search("hello world", max_results=3))
+    assert r1["count"] == 1 and r2["count"] == 1
+    assert r2.get("cached") is True, "second identical query must be cached"
+    assert call_count["n"] == 1, "backend must be hit only once"
+    print("✓ search cache (case-insensitive) OK")
+
+
+def test_image_upload_mime_detection():
+    """_detect_image_mime must accept:
+         - explicit image/* content-type
+         - filename extension when content-type is application/octet-stream
+         - magic-number sniffing when neither is available.
+    Regression for: 'upload image doesn't work'.
+    """
+    from backend.server import _detect_image_mime
+    # PNG magic
+    png_bytes = b"\x89PNG\r\n\x1a\n" + b"\x00" * 20
+    assert _detect_image_mime("", "", png_bytes) == "image/png"
+    # JPEG magic
+    jpeg_bytes = b"\xff\xd8\xff\xe0" + b"\x00" * 20
+    assert _detect_image_mime("", "application/octet-stream", jpeg_bytes) == "image/jpeg"
+    # GIF
+    gif_bytes = b"GIF89a" + b"\x00" * 20
+    assert _detect_image_mime("", "", gif_bytes) == "image/gif"
+    # WEBP
+    webp_bytes = b"RIFF\x00\x00\x00\x00WEBP" + b"\x00" * 20
+    assert _detect_image_mime("pic.webp", "", webp_bytes) == "image/webp"
+    # Charset param must be stripped (real-world bug)
+    assert _detect_image_mime("a.jpg", "image/jpeg; charset=binary", b"") == "image/jpeg"
+    # Filename fallback when content-type is missing
+    assert _detect_image_mime("pic.PNG", "", b"") == "image/png"
+    # Non-image → None
+    assert _detect_image_mime("note.txt", "text/plain", b"hello") is None
+    print("✓ image upload MIME detection (charset/octet-stream/magic) OK")
+
+
+def test_upload_image_endpoint_accepts_octet_stream():
+    """Full round-trip: POST /api/upload/image with an octet-stream JPEG
+    (mirrors what some mobile browsers send) must succeed.
+    """
+    from fastapi.testclient import TestClient
+    from backend import server as _srv
+    from backend import auth as _auth
+    import importlib
+    importlib.reload(_auth)
+    _auth.ensure_owner()
+
+    client = TestClient(_srv.app)
+    # Log in as owner to get a token
+    r = client.post("/api/auth/login", json={"username": "ADMIN",
+                                             "password": os.environ["OWNER_PASS"]})
+    assert r.status_code == 200, r.text
+    token = r.json()["token"]
+
+    # A minimal valid JPEG (SOI + APP0 + EOI)
+    jpeg = (b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01"
+            b"\x00\x00\xff\xd9")
+    files = {"file": ("photo.jpg", jpeg, "application/octet-stream")}
+    r = client.post("/api/upload/image", files=files,
+                    headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200, f"expected 200 got {r.status_code}: {r.text}"
+    body = r.json()
+    assert body["image_id"].startswith("img_")
+    assert body["mime"] == "image/jpeg"
+    assert body["size"] == len(jpeg)
+
+    # A text file must be rejected with 400
+    r2 = client.post("/api/upload/image",
+                     files={"file": ("note.txt", b"hello", "text/plain")},
+                     headers={"Authorization": f"Bearer {token}"})
+    assert r2.status_code == 400
+
+    # And unauthorized must be 401
+    r3 = client.post("/api/upload/image",
+                     files={"file": ("photo.jpg", jpeg, "image/jpeg")})
+    assert r3.status_code == 401
+
+    print("✓ /api/upload/image accepts octet-stream + rejects non-images OK")
+
+
 if __name__ == "__main__":
     test_auth_module()
     test_tools_signature_dedup()
@@ -258,4 +389,9 @@ if __name__ == "__main__":
     test_available_models_has_kimi_and_minimax()
     test_backoff_helper_429_grows()
     test_client_routes_minimax_separately()
+    # v2.4 regression tests
+    test_search_survives_ratelimit()
+    test_search_cached_key_case_insensitive()
+    test_image_upload_mime_detection()
+    test_upload_image_endpoint_accepts_octet_stream()
     print("\nALL TESTS PASSED ✅")

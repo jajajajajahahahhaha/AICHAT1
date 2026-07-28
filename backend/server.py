@@ -560,25 +560,82 @@ async def delete_chat(chat_id: str, authorization: Optional[str] = Header(None))
 
 
 # ---------- File upload ----------
+_IMAGE_MIME_ALIASES = {
+    "jpg": "jpeg",
+    "pjpeg": "jpeg",
+    "x-png": "png",
+    "svg+xml": "svg",
+}
+_IMAGE_EXT_FROM_FILENAME = {
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+    ".gif": "image/gif", ".webp": "image/webp", ".bmp": "image/bmp",
+    ".heic": "image/heic", ".heif": "image/heif",
+}
+
+
+def _detect_image_mime(filename: str, content_type: str, data: bytes) -> Optional[str]:
+    """Robustly determine an image mime type.
+
+    Some browsers/mobile clients send content_type='' or
+    'application/octet-stream' for images. We look at the filename extension
+    and, as a last resort, sniff the first bytes for a magic number.
+    """
+    # Strip any "; charset=..." or params
+    ct = (content_type or "").split(";")[0].strip().lower()
+    if ct.startswith("image/"):
+        return ct
+
+    ext = ""
+    if filename:
+        ext = ("." + filename.rsplit(".", 1)[-1].lower()) if "." in filename else ""
+    if ext in _IMAGE_EXT_FROM_FILENAME:
+        return _IMAGE_EXT_FROM_FILENAME[ext]
+
+    # Magic-number sniff (covers PNG/JPEG/GIF/WEBP/BMP)
+    if len(data) >= 12:
+        if data[:8] == b"\x89PNG\r\n\x1a\n":
+            return "image/png"
+        if data[:3] == b"\xff\xd8\xff":
+            return "image/jpeg"
+        if data[:6] in (b"GIF87a", b"GIF89a"):
+            return "image/gif"
+        if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
+            return "image/webp"
+        if data[:2] == b"BM":
+            return "image/bmp"
+    return None
+
+
 @app.post("/api/upload/image")
 async def upload_image(file: UploadFile = File(...), authorization: Optional[str] = Header(None)):
     require_user(authorization)
-    if not file.content_type or not file.content_type.startswith("image/"):
-        raise HTTPException(400, "Only image files allowed")
     data = await file.read()
+    if not data:
+        raise HTTPException(400, "Empty file")
     if len(data) > 10 * 1024 * 1024:
         raise HTTPException(400, "Image too large (max 10MB)")
+
+    mime = _detect_image_mime(file.filename or "", file.content_type or "", data)
+    if not mime:
+        raise HTTPException(400, "Only image files allowed (could not detect image type)")
+
     b64 = base64.b64encode(data).decode("ascii")
     image_id = f"img_{uuid.uuid4().hex[:12]}"
-    store_image(image_id, b64, file.content_type)
-    # Also persist to disk so it survives restarts (image gets loaded on demand).
+    store_image(image_id, b64, mime)
+
+    # Persist to disk so the image survives worker restarts.
     try:
-        ext = (file.content_type.split("/")[-1] or "png").split(";")[0]
+        # Robust extension derivation: strip any charset param, alias 'jpg' etc.
+        subtype = mime.split("/", 1)[1].split(";")[0].strip().lower() or "png"
+        ext = _IMAGE_MIME_ALIASES.get(subtype, subtype)
+        # Sanitise — extensions must be alnum only
+        ext = "".join(ch for ch in ext if ch.isalnum()) or "png"
         (IMAGES_DIR / f"{image_id}.{ext}").write_bytes(data)
-        (IMAGES_DIR / f"{image_id}.meta").write_text(file.content_type, encoding="utf-8")
+        (IMAGES_DIR / f"{image_id}.meta").write_text(mime, encoding="utf-8")
     except Exception as e:
         log.warning("Failed to persist image %s: %s", image_id, e)
-    return {"image_id": image_id, "size": len(data), "mime": file.content_type}
+
+    return {"image_id": image_id, "size": len(data), "mime": mime}
 
 
 @app.post("/api/upload/file")
