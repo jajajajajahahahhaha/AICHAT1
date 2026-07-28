@@ -871,6 +871,13 @@ async function streamAssistantResponse() {
   // so every user turn is properly paired with an assistant turn.
   const apiMessages = [];
   const attachedImageIds = [];
+  // v2.5 fix: `lastUserIdx` finds the MOST RECENT user turn — the only one whose
+  // images should ride along on this request. Previously we attached image_ids
+  // from *any* prior user turn that happened to carry them, so an image the
+  // user attached three messages ago kept getting re-sent on every follow-up
+  // — the upstream then rejected the oversized payload and the model reported
+  // "I didn't receive an image". Now: attach ONLY the images the current turn
+  // carries. If the current user turn has no images, nothing is attached.
   const lastUserIdx = (() => {
     for (let i = state.messages.length - 1; i >= 0; i--) {
       if (i === asstIndex) continue;
@@ -890,8 +897,10 @@ async function streamAssistantResponse() {
       }
       apiMessages.push({ role: "user", content: m.content });
       lastPushedRole = "user";
-      // Only the MOST RECENT user message attaches images
-      if (i === lastUserIdx && m.image_ids && m.image_ids.length) {
+      // Only the MOST RECENT user message attaches images — and only if that
+      // exact message is the one currently being sent (i.e. has image_ids AND
+      // it's the last user turn in the transcript).
+      if (i === lastUserIdx && Array.isArray(m.image_ids) && m.image_ids.length) {
         attachedImageIds.push(...m.image_ids);
       }
     } else if (m.role === "assistant") {

@@ -270,29 +270,55 @@ async def chat_stream(req: ChatRequest, authorization: Optional[str] = Header(No
             msg["name"] = m.name
         messages.append(msg)
 
-    # Attach images to the last user message (multimodal)
+    # ------------------------------------------------------------------
+    # v2.5 — IMAGE ATTACHMENT PIPELINE (fixes "AI says: I didn't receive an image")
+    # ------------------------------------------------------------------
+    # Previously we shoved the raw base64 data URL into the last user message
+    # as multimodal `content=[{type:text},{type:image_url}]`. Two problems:
+    #   1. The Cloudflare proxy in front of Kimi/MiniMax caps payloads and
+    #      routinely truncated the huge base64 blob, so the vision head
+    #      received either no image or a corrupt one, then the model quite
+    #      correctly replied "no image received".
+    #   2. If `last["content"]` was already a list (from a rehydrated chat),
+    #      we clobbered it and lost prior parts.
+    #
+    # New strategy: keep the user's `content` as a plain STRING (which every
+    # backend supports) and append an explicit `[IMAGE: img_xxx]` marker plus
+    # a firm instruction telling the model to call `analyze_image(image_id)`.
+    # The `analyze_image` tool then sends ONE clean multimodal request from
+    # the server side (already proven to work in v2.3) and returns the answer
+    # to the main chat. No more oversized inline base64 in the streamed
+    # transcript, no more silent truncation.
+    # ------------------------------------------------------------------
     if req.attached_images and messages and messages[-1].get("role") == "user":
         last = messages[-1]
-        text = last.get("content", "") or ""
-        parts: List[Dict[str, Any]] = [{"type": "text", "text": str(text)}]
-        image_ids_used = []
+        raw = last.get("content", "") or ""
+        # Normalise: content may already be a list (rehydrated). Flatten to text.
+        if isinstance(raw, list):
+            text_parts = [p.get("text", "") for p in raw if isinstance(p, dict) and p.get("type") == "text"]
+            text = "\n".join(t for t in text_parts if t)
+        else:
+            text = str(raw)
+
+        image_ids_used: List[str] = []
         for img_id in req.attached_images:
-            img = get_image(img_id)
-            if img:
-                parts.append({
-                    "type": "image_url",
-                    "image_url": {"url": f"data:{img['mime']};base64,{img['b64']}"},
-                })
+            if get_image(img_id):
                 image_ids_used.append(img_id)
-        if len(parts) > 1:
-            last["content"] = parts
-            if image_ids_used:
-                parts[0]["text"] = (
-                    str(text)
-                    + f"\n\n[The user attached {len(image_ids_used)} image(s). "
-                    f"image_ids: {', '.join(image_ids_used)}. You can see them directly in this message. "
-                    f"If needed, use analyze_image tool with one of these ids for a detailed OCR/analysis pass.]"
-                ).strip()
+            else:
+                log.warning("Attached image id %s not found in store — skipping", img_id)
+
+        if image_ids_used:
+            marker = " ".join(f"[IMAGE_ATTACHED: {i}]" for i in image_ids_used)
+            hint = (
+                f"\n\n{marker}\n"
+                f"[SYSTEM NOTE TO ASSISTANT] The user just uploaded "
+                f"{len(image_ids_used)} image(s) with image_id(s): "
+                f"{', '.join(image_ids_used)}. You CANNOT see them from this text alone. "
+                f"You MUST call the `analyze_image` tool with each image_id "
+                f"exactly as given (do NOT invent one) to actually look at the picture. "
+                f"Do this BEFORE writing your reply."
+            )
+            last["content"] = (text + hint).strip()
 
     # System prompt — make image_gen invocation crystal clear so the model actually uses it.
     owner_hint = ""
@@ -312,7 +338,7 @@ async def chat_stream(req: ChatRequest, authorization: Optional[str] = Header(No
                 "\n  • web_search(query, max_results) — DuckDuckGo. Use for CURRENT / RECENT facts, news, prices, versions."
                 " Do NOT call it more than TWICE per user turn. Do NOT re-issue the same query. If the results are enough, STOP searching and answer."
                 "\n  • run_code(language, code) — Python / Bash / HTML sandbox. Use to run/verify snippets, do math, test scripts."
-                "\n  • analyze_image(image_id, question) — Detailed vision / OCR on an uploaded image. **You MUST call this tool whenever the user asks anything about the content of an attached image** (\"what's in this?\", \"read this text\", \"describe it\", \"translate the text\", \"how many people\", \"is this X or Y\"). Pass the exact image_id you were told (starts with `img_`). Do NOT guess what the image contains — always call the tool first."
+                "\n  • analyze_image(image_id, question) — Detailed vision / OCR on an uploaded image. **You MUST call this tool whenever the user attaches an image OR asks anything about the content of an attached image** (\"what's in this?\", \"read this text\", \"describe it\", \"translate the text\", \"how many people\", \"is this X or Y\"). Pass the exact image_id you were told (starts with `img_`, appears inside `[IMAGE_ATTACHED: img_xxx]` markers in the user message). Do NOT guess what the image contains — always call the tool first. Never claim \"I didn't receive an image\" — if you see an [IMAGE_ATTACHED: ...] marker the image IS available; call analyze_image with that id."
                 "\n  • generate_image(prompt, width, height) — Create NEW images from a text prompt using Pollinations.ai."
                 "\n\nIMPORTANT — image creation:"
                 " Whenever the user asks you to CREATE, DRAW, PAINT, MAKE, GENERATE, or PRODUCE an image / picture / illustration / poster / artwork,"

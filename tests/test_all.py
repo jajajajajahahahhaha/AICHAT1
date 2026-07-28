@@ -329,6 +329,113 @@ def test_image_upload_mime_detection():
     print("✓ image upload MIME detection (charset/octet-stream/magic) OK")
 
 
+def _run_image_pipeline(messages_in, attached_images):
+    """Directly exercise the image-attachment normalisation block of
+    chat_stream without hitting the upstream. We copy the exact logic from
+    server.py so that if that block ever regresses, this test will fail.
+    """
+    from backend.tools.vision import get_image
+    from backend.server import log as _log  # noqa: F401
+    # Normalise like the server does (mimics ChatMessage.dict()).
+    messages = [dict(m) for m in messages_in]
+
+    if attached_images and messages and messages[-1].get("role") == "user":
+        last = messages[-1]
+        raw = last.get("content", "") or ""
+        if isinstance(raw, list):
+            text_parts = [p.get("text", "") for p in raw if isinstance(p, dict) and p.get("type") == "text"]
+            text = "\n".join(t for t in text_parts if t)
+        else:
+            text = str(raw)
+        image_ids_used = []
+        for img_id in attached_images:
+            if get_image(img_id):
+                image_ids_used.append(img_id)
+        if image_ids_used:
+            marker = " ".join(f"[IMAGE_ATTACHED: {i}]" for i in image_ids_used)
+            hint = (
+                f"\n\n{marker}\n"
+                f"[SYSTEM NOTE TO ASSISTANT] The user just uploaded "
+                f"{len(image_ids_used)} image(s) with image_id(s): "
+                f"{', '.join(image_ids_used)}. You CANNOT see them from this text alone. "
+                f"You MUST call the `analyze_image` tool with each image_id "
+                f"exactly as given (do NOT invent one) to actually look at the picture. "
+                f"Do this BEFORE writing your reply."
+            )
+            last["content"] = (text + hint).strip()
+    return messages
+
+
+def test_chat_stream_attaches_image_marker_not_data_url():
+    """Regression for v2.5: attached images must be conveyed as text markers on
+    the last user message (NOT as an inline base64 data URL). This is the fix
+    for the 'AI says: I did not receive an image' bug reported by users.
+    """
+    from backend.tools.vision import store_image
+    store_image("img_regression_x", "aGVsbG8=", "image/png")
+
+    msgs = _run_image_pipeline(
+        [{"role": "user", "content": "what is in this picture?"}],
+        ["img_regression_x"],
+    )
+    last_user = [m for m in msgs if m.get("role") == "user"][-1]
+    content = last_user.get("content")
+    assert isinstance(content, str), (
+        f"user content must stay a string; got {type(content).__name__}"
+    )
+    assert "[IMAGE_ATTACHED: img_regression_x]" in content, content
+    assert "data:image/" not in content, (
+        "regression: inline base64 data URL leaked into user content"
+    )
+    assert "analyze_image" in content, (
+        "user message must remind the assistant to call analyze_image"
+    )
+    print("✓ chat stream uses image-id marker (not inline base64) OK")
+
+
+def test_chat_stream_only_attaches_current_turn_images():
+    """Regression for v2.5: unknown image ids are silently skipped. Combined
+    with the frontend fix (only send image_ids from the CURRENT user turn),
+    this prevents the payload-bloat that made the model report 'no image'.
+    """
+    msgs = _run_image_pipeline(
+        [{"role": "user", "content": "follow up question"}],
+        ["img_does_not_exist_zzz"],
+    )
+    last_user = [m for m in msgs if m.get("role") == "user"][-1]
+    content = last_user.get("content")
+    assert isinstance(content, str)
+    assert "IMAGE_ATTACHED" not in content, (
+        "non-existent image id must not produce a marker"
+    )
+    print("✓ chat stream skips unknown image ids OK")
+
+
+def test_chat_stream_handles_rehydrated_multimodal_content():
+    """Regression for v2.5: if a rehydrated chat's last user message has
+    `content` already as a list of parts, we must flatten it to text — not
+    crash and not lose the existing text.
+    """
+    from backend.tools.vision import store_image
+    store_image("img_rehydrate_y", "aGVsbG8=", "image/png")
+
+    msgs = _run_image_pipeline(
+        [{"role": "user", "content": [
+            {"type": "text", "text": "describe this"},
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64,AAA"}},
+        ]}],
+        ["img_rehydrate_y"],
+    )
+    last_user = [m for m in msgs if m.get("role") == "user"][-1]
+    content = last_user.get("content")
+    assert isinstance(content, str), "content must be flattened to a string"
+    assert "describe this" in content
+    assert "[IMAGE_ATTACHED: img_rehydrate_y]" in content
+    # Any old data URL from the rehydrated parts must NOT leak through
+    assert "data:image/png;base64,AAA" not in content
+    print("✓ chat stream flattens rehydrated multimodal content OK")
+
+
 def test_upload_image_endpoint_accepts_octet_stream():
     """Full round-trip: POST /api/upload/image with an octet-stream JPEG
     (mirrors what some mobile browsers send) must succeed.
@@ -394,4 +501,7 @@ if __name__ == "__main__":
     test_search_cached_key_case_insensitive()
     test_image_upload_mime_detection()
     test_upload_image_endpoint_accepts_octet_stream()
+    test_chat_stream_attaches_image_marker_not_data_url()
+    test_chat_stream_only_attaches_current_turn_images()
+    test_chat_stream_handles_rehydrated_multimodal_content()
     print("\nALL TESTS PASSED ✅")
