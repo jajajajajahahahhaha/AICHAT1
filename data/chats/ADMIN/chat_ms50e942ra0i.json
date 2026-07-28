@@ -1,0 +1,58 @@
+{
+  "id": "chat_ms50e942ra0i",
+  "title": "یه سرچ میزنی ببینی امروز تو ایران چه ماه چندمه",
+  "messages": [
+    {
+      "role": "user",
+      "content": "یه سرچ میزنی ببینی امروز تو ایران چه ماه چندمه",
+      "display_content": "یه سرچ میزنی ببینی امروز تو ایران چه ماه چندمه",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " امروز **سه‌شنبه**، **۶ مرداد ۱۴۰۵** هجری شمسی است. 🗓️\n\nیعنی:\n- **ماه:** مرداد\n- **روز:** ۶\n- **سال:** ۱۴۰۵\n\nتقریباً یک ماه از تابستان گذشته و هوا در اکثر نقاط ایران گرم و گاهی اوج گرماست. امیدوارم روز خوبی داشته باشی! ☀️",
+      "tool_events": [
+        {
+          "name": "web_search",
+          "args": {
+            "query": "امروز چه ماه چندمه شمسی ایران 1403",
+            "max_results": 5
+          },
+          "id": "functions.web_search:0",
+          "summary": "امروز چه ماه چندمه شمسی ایران 1403"
+        },
+        {
+          "name": "run_code",
+          "args": {
+            "language": "python",
+            "code": "import jdatetime\nfrom datetime import datetime\n\n# Get current Gregorian date\nnow_gregorian = datetime.now()\n\n# Convert to Jalali (Shamsi)\nnow_jalali = jdatetime.datetime.now()\n\nprint(f\"تاریخ میلادی امروز: {now_gregorian.strftime('%Y-%m-%d')}\")\nprint(f\"تاریخ شمسی امروز: {now_jalali.strftime('%Y/%m/%d')}\")\nprint(f\"تاریخ شمسی امروز به فارسی: {now_jalali.strftime('%A %d %B %Y')}\")\nprint(f\"ماه شمسی: {now_jalali.month}\")\nprint(f\"روز شمسی: {now_jalali.day}\")\nprint(f\"سال شمسی: {now_jalali.year}\")\n"
+          },
+          "id": "functions.run_code:1",
+          "summary": "python • import jdatetime"
+        },
+        {
+          "name": "run_code",
+          "args": {
+            "language": "bash",
+            "code": "pip install jdatetime -q"
+          },
+          "id": "functions.run_code:2",
+          "summary": "bash • pip install jdatetime -q"
+        },
+        {
+          "name": "run_code",
+          "args": {
+            "language": "python",
+            "code": "import jdatetime\nfrom datetime import datetime\n\n# Get current date\nnow_jalali = jdatetime.datetime.now()\n\n# Persian month names\nmonth_names = {\n    1: \"فروردین\",\n    2: \"اردیبهشت\",\n    3: \"خرداد\",\n    4: \"تیر\",\n    5: \"مرداد\",\n    6: \"شهریور\",\n    7: \"مهر\",\n    8: \"آبان\",\n    9: \"آذر\",\n    10: \"دی\",\n    11: \"بهمن\",\n    12: \"اسفند\"\n}\n\n# Persian weekday names\nweekday_names = {\n    0: \"شنبه\",\n    1: \"یکشنبه\",\n    2: \"دوشنبه\",\n    3: \"سه‌شنبه\",\n    4: \"چهارشنبه\",\n    5: \"پنجشنبه\",\n    6: \"جمعه\"\n}\n\nyear = now_jalali.year\nmonth = now_jalali.month\nday = now_jalali.day\nweekday = now_jalali.weekday()\n\nprint(f\"امروز: {weekday_names[weekday]}\")\nprint(f\"تاریخ شمسی: {year}/{month:02d}/{day:02d}\")\nprint(f\"{day} {month_names[month]} {year}\")\n"
+          },
+          "id": "functions.run_code:3",
+          "summary": "python • import jdatetime"
+        }
+      ],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785264626.8536718
+}
