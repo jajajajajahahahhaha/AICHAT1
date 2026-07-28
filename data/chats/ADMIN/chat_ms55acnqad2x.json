@@ -1,0 +1,25 @@
+{
+  "id": "chat_ms55acnqad2x",
+  "title": "این عکس رو توضیح بدهب",
+  "messages": [
+    {
+      "role": "user",
+      "content": "این عکس رو توضیح بدهب",
+      "display_content": "این عکس رو توضیح بدهب",
+      "images": [
+        "blob:https://toner-win-accounts-arrangement.trycloudflare.com/84b476ee-c695-48c7-9b66-9e37d9c1627a"
+      ],
+      "image_ids": [
+        "img_2490fb6091c6"
+      ],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_events": [],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785272831.1423144
+}
