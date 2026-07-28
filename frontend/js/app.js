@@ -252,16 +252,27 @@ el("attachFileBtn").addEventListener("click", () => el("fileInput").click());
 el("imageInput").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  // Client-side guard so the user sees the real reason instead of a generic 400.
+  if (file.size > 10 * 1024 * 1024) {
+    showToast(t("error") + ": image too large (max 10MB)", "error");
+    el("imageInput").value = "";
+    return;
+  }
   const url = URL.createObjectURL(file);
   const fd = new FormData();
   fd.append("file", file);
   try {
     const res = await fetch("/api/upload/image", { method: "POST", body: fd, headers: authHeaders() });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || "upload failed");
+    let data = {};
+    try { data = await res.json(); } catch { /* non-json error body */ }
+    if (!res.ok) {
+      throw new Error(data.detail || `upload failed (HTTP ${res.status})`);
+    }
+    if (!data.image_id) throw new Error("upload failed: server did not return image_id");
     state.attachments.push({ kind: "image", image_id: data.image_id, url, mime: data.mime, name: file.name });
     renderAttachments();
   } catch (err) {
+    console.error("[upload/image]", err);
     showToast(t("error") + ": " + err.message, "error");
   }
   el("imageInput").value = "";
