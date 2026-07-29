@@ -80,6 +80,24 @@
           <option value="fast" selected>🚀 Fast</option>
           <option value="thinking">🧠 Thinking</option>
         </select>
+
+        <!-- ✦ Agent Mode Toggle ✦ -->
+        <div class="agent-toggle-wrap" id="agentToggle" title="Switch to Agent Mode">
+          <div class="toggle-track"><div class="toggle-thumb"></div></div>
+          <span class="toggle-label" id="agentToggleLabel">Normal</span>
+        </div>
+
+        <!-- Agent Picker (visible only in agent mode) -->
+        <div class="agent-picker-wrap" id="agentPickerWrap">
+          <button class="agent-select-btn" id="agentSelectBtn">
+            <span class="agent-dot"></span>
+            <span id="agentSelectLabel">Auto Route</span>
+            <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="agent-dropdown" id="agentDropdown">
+            <!-- populated by JS from /api/agents -->
+          </div>
+        </div>
       </div>
 
       <button class="icon-btn" id="topNewChat" aria-label="New chat">

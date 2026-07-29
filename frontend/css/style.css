@@ -901,3 +901,187 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
   .msg-actions { opacity: 1; } /* always visible on touch */
   .toast-host { right: 12px; left: 12px; bottom: 90px; }
 }
+
+/* ============================================================
+   Agent System — v3.0
+   Toggle Switch (Normal ↔ Agent) + Agent Picker Dropdown
+   ============================================================ */
+
+/* ---------- Mode Toggle Switch ---------- */
+.agent-toggle-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px 4px 6px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  cursor: pointer;
+  user-select: none;
+  transition: border-color .18s, background .15s;
+  flex-shrink: 0;
+}
+.agent-toggle-wrap:hover { border-color: var(--border-strong); background: var(--bg-elevated); }
+.agent-toggle-wrap.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.toggle-track {
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--border-strong);
+  position: relative;
+  transition: background .2s var(--ease);
+  flex-shrink: 0;
+}
+.agent-toggle-wrap.active .toggle-track { background: var(--accent); }
+
+.toggle-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 2px; left: 2px;
+  transition: transform .2s var(--ease), box-shadow .15s;
+  box-shadow: 0 1px 3px rgba(0,0,0,.35);
+}
+.agent-toggle-wrap.active .toggle-thumb { transform: translateX(14px); }
+
+.toggle-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dim);
+  transition: color .15s;
+  white-space: nowrap;
+}
+.agent-toggle-wrap.active .toggle-label { color: var(--accent); }
+
+/* ---------- Agent Picker Dropdown ---------- */
+.agent-picker-wrap {
+  position: relative;
+  display: none;   /* shown only when agent mode is ON */
+}
+.agent-picker-wrap.visible { display: block; }
+
+.agent-select-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-hover);
+  color: var(--text);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color .18s, background .15s;
+  white-space: nowrap;
+}
+.agent-select-btn:hover { border-color: var(--border-strong); background: var(--bg-elevated); }
+.agent-select-btn .agent-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.agent-select-btn .chevron {
+  opacity: .55;
+  transition: transform .18s;
+}
+.agent-select-btn.open .chevron { transform: rotate(180deg); }
+
+.agent-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 240px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  z-index: 200;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(-6px) scale(.97);
+  pointer-events: none;
+  transition: opacity .18s var(--ease), transform .18s var(--ease);
+}
+.agent-dropdown.open {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: all;
+}
+
+.agent-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background .12s;
+}
+.agent-option:hover { background: var(--bg-hover); }
+.agent-option.selected { background: var(--accent-soft); }
+
+.agent-opt-emoji {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.agent-opt-info { flex: 1; min-width: 0; }
+.agent-opt-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.agent-opt-desc {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.agent-opt-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity .12s;
+}
+.agent-option.selected .agent-opt-dot { opacity: 1; }
+
+/* Auto-route option (special first item) */
+.agent-option.auto-option {
+  border-bottom: 1px solid var(--border);
+}
+.agent-option.auto-option .agent-opt-name { color: var(--accent); }
+
+/* ---------- Agent Badge in messages ---------- */
+.agent-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  border: 1px solid rgba(124,156,255,.2);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+/* ---------- Thinking indicator agent variant ---------- */
+.thinking.agent-thinking .dots span { background: var(--accent); }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .agent-toggle-wrap { padding: 4px 8px 4px 5px; }
+  .toggle-label { display: none; }
+  .agent-select-btn { font-size: 12px; padding: 5px 8px; }
+  .agent-dropdown { min-width: 200px; }
+}

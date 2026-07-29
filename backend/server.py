@@ -32,6 +32,21 @@ from backend.tools.sandbox import run_code
 from backend.tools.vision import analyze_image, store_image, get_image
 from backend.tools.image_gen import generate_image
 from backend import auth
+from backend.agents import (
+    AGENT_DEFINITIONS,
+    route_to_agent,
+    DesignerAgent,
+    CoderAgent,
+    PromptOptimizerAgent,
+    ImageSpecialistAgent,
+)
+
+_AGENT_MAP = {
+    "designer":         DesignerAgent(),
+    "coder":            CoderAgent(),
+    "prompt_opt":       PromptOptimizerAgent(),
+    "image_specialist": ImageSpecialistAgent(),
+}
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 log = logging.getLogger("kimi-chat")
@@ -64,6 +79,9 @@ class ChatRequest(BaseModel):
     model: Optional[str] = None
     mode: str = "fast"  # lite | fast | thinking
     attached_images: Optional[List[str]] = None
+    # Agent system: "normal" = off, "auto" = router picks, or explicit agent id
+    agent_mode: str = "normal"    # normal | auto | designer | coder | prompt_opt | image_specialist
+    agent_id: Optional[str] = None  # explicit override from UI
 
 
 class SaveChatRequest(BaseModel):
@@ -118,6 +136,12 @@ async def health():
 @app.get("/api/models")
 async def get_models():
     return {"models": AVAILABLE_MODELS}
+
+
+@app.get("/api/agents")
+async def get_agents():
+    """Return available agent definitions for the frontend picker."""
+    return {"agents": AGENT_DEFINITIONS}
 
 
 @app.get("/api/debug/ping")
@@ -252,6 +276,25 @@ async def chat_stream(req: ChatRequest, authorization: Optional[str] = Header(No
     except Exception as e:
         raise HTTPException(500, str(e))
 
+    # ---- Agent System -------------------------------------------------------
+    # Determine which agent (if any) should handle this request.
+    #   agent_mode="normal"  → no agent, standard chat
+    #   agent_mode="auto"    → router decides based on message content
+    #   agent_mode=<id>      → user explicitly picked an agent
+    active_agent = None
+    agent_cfg: dict = {}
+
+    if req.agent_mode and req.agent_mode != "normal":
+        override_id = req.agent_id if req.agent_mode == "auto" else req.agent_mode
+        # Build raw message list for router
+        raw_msgs = [{"role": m.role, "content": m.content} for m in req.messages]
+        picked_id = route_to_agent(raw_msgs, user_override=override_id if override_id != "auto" else None)
+        if picked_id and picked_id in _AGENT_MAP:
+            active_agent = _AGENT_MAP[picked_id]
+            agent_cfg = active_agent.build_config()
+            log.info("[AGENT] Using %s (mode=%s picked=%s)",
+                     active_agent.display_name, req.agent_mode, picked_id)
+
     # Normalize messages
     messages: List[Dict[str, Any]] = []
     for m in req.messages:
@@ -320,7 +363,7 @@ async def chat_stream(req: ChatRequest, authorization: Optional[str] = Header(No
             )
             last["content"] = (text + hint).strip()
 
-    # System prompt — make image_gen invocation crystal clear so the model actually uses it.
+    # System prompt — either from active agent or the standard prompt.
     owner_hint = ""
     if user.get("is_owner"):
         owner_hint = (
@@ -329,36 +372,65 @@ async def chat_stream(req: ChatRequest, authorization: Optional[str] = Header(No
         )
 
     if not messages or messages[0].get("role") != "system":
-        messages.insert(0, {
-            "role": "system",
-            "content": (
-                "You are Kimi, a precise, helpful AI assistant running on GitHub Actions."
-                f"{owner_hint}"
-                "\n\nYou have four tools:"
-                "\n  • web_search(query, max_results) — DuckDuckGo. Use for CURRENT / RECENT facts, news, prices, versions."
-                " Do NOT call it more than TWICE per user turn. Do NOT re-issue the same query. If the results are enough, STOP searching and answer."
-                "\n  • run_code(language, code) — Python / Bash / HTML sandbox. Use to run/verify snippets, do math, test scripts."
-                "\n  • analyze_image(image_id, question) — Detailed vision / OCR on an uploaded image. **You MUST call this tool whenever the user attaches an image OR asks anything about the content of an attached image** (\"what's in this?\", \"read this text\", \"describe it\", \"translate the text\", \"how many people\", \"is this X or Y\"). Pass the exact image_id you were told (starts with `img_`, appears inside `[IMAGE_ATTACHED: img_xxx]` markers in the user message). Do NOT guess what the image contains — always call the tool first. Never claim \"I didn't receive an image\" — if you see an [IMAGE_ATTACHED: ...] marker the image IS available; call analyze_image with that id."
-                "\n  • generate_image(prompt, width, height) — Create NEW images from a text prompt using Pollinations.ai."
-                "\n\nIMPORTANT — image creation:"
-                " Whenever the user asks you to CREATE, DRAW, PAINT, MAKE, GENERATE, or PRODUCE an image / picture / illustration / poster / artwork,"
-                " you MUST call `generate_image` with a VIVID, DETAILED English prompt (subject, style, lighting, composition, colors, mood)."
-                " Do NOT reply with just text; call the tool. After the tool returns, briefly describe what you created in the user's language."
-                " **NEVER hand-write a pollinations.ai URL yourself** — always use the URL returned by the tool verbatim. If you need to reference the image again in the same reply, refer to it as \"the image above\" instead of retyping the URL."
-                "\n\nRules:"
-                "\n  - Reply in the SAME language as the user (Persian ↔ English)."
-                "\n  - Format code as fenced blocks with a language tag (```python, ```html, ...)."
-                "\n  - Do not repeat the same tool call — one search / one code run per intent is enough."
-                "\n  - After tools finish, ALWAYS produce a final text answer for the user. Never end a turn with only tool calls and no words."
-                + mode_cfg["system_extra"]
-            ),
-        })
+        if active_agent:
+            # ---- Agent system prompt ----------------------------------------
+            sys_content = agent_cfg["system_message"]["content"]
+            if owner_hint:
+                sys_content += owner_hint
+            sys_content += mode_cfg["system_extra"]
+            messages.insert(0, {"role": "system", "content": sys_content})
+            # Inject few-shot examples right after system prompt
+            for ex in agent_cfg.get("few_shot", []):
+                messages.insert(len([m for m in messages if m.get("role") == "system"]), ex)
+        else:
+            # ---- Standard system prompt -------------------------------------
+            messages.insert(0, {
+                "role": "system",
+                "content": (
+                    "You are Kimi, a precise, helpful AI assistant running on GitHub Actions."
+                    f"{owner_hint}"
+                    "\n\nYou have four tools:"
+                    "\n  • web_search(query, max_results) — DuckDuckGo. Use for CURRENT / RECENT facts, news, prices, versions."
+                    " Do NOT call it more than TWICE per user turn. Do NOT re-issue the same query. If the results are enough, STOP searching and answer."
+                    "\n  • run_code(language, code) — Python / Bash / HTML sandbox. Use to run/verify snippets, do math, test scripts."
+                    "\n  • analyze_image(image_id, question) — Detailed vision / OCR on an uploaded image. **You MUST call this tool whenever the user attaches an image OR asks anything about the content of an attached image** (\"what's in this?\", \"read this text\", \"describe it\", \"translate the text\", \"how many people\", \"is this X or Y\"). Pass the exact image_id you were told (starts with `img_`, appears inside `[IMAGE_ATTACHED: img_xxx]` markers in the user message). Do NOT guess what the image contains — always call the tool first. Never claim \"I didn't receive an image\" — if you see an [IMAGE_ATTACHED: ...] marker the image IS available; call analyze_image with that id."
+                    "\n  • generate_image(prompt, width, height) — Create NEW images from a text prompt using Pollinations.ai."
+                    "\n\nIMPORTANT — image creation:"
+                    " Whenever the user asks you to CREATE, DRAW, PAINT, MAKE, GENERATE, or PRODUCE an image / picture / illustration / poster / artwork,"
+                    " you MUST call `generate_image` with a VIVID, DETAILED English prompt (subject, style, lighting, composition, colors, mood)."
+                    " Do NOT reply with just text; call the tool. After the tool returns, briefly describe what you created in the user's language."
+                    " **NEVER hand-write a pollinations.ai URL yourself** — always use the URL returned by the tool verbatim. If you need to reference the image again in the same reply, refer to it as \"the image above\" instead of retyping the URL."
+                    "\n\nRules:"
+                    "\n  - Reply in the SAME language as the user (Persian ↔ English)."
+                    "\n  - Format code as fenced blocks with a language tag (```python, ```html, ...)."
+                    "\n  - Do not repeat the same tool call — one search / one code run per intent is enough."
+                    "\n  - After tools finish, ALWAYS produce a final text answer for the user. Never end a turn with only tool calls and no words."
+                    + mode_cfg["system_extra"]
+                ),
+            })
 
-    tools = TOOL_DEFINITIONS if req.enable_tools else None
+    # ---- Tool filtering for active agent ------------------------------------
+    if active_agent and agent_cfg.get("tools_allowed") is not None:
+        allowed = set(agent_cfg["tools_allowed"])
+        tools = [t for t in TOOL_DEFINITIONS if t["function"]["name"] in allowed] \
+            if req.enable_tools else None
+    else:
+        tools = TOOL_DEFINITIONS if req.enable_tools else None
+
+    # ---- Override inference params from agent -------------------------------
+    if active_agent:
+        mode_cfg = {
+            "temperature": agent_cfg["temperature"],
+            "max_tokens":  agent_cfg["max_tokens"],
+            "system_extra": "",
+        }
+        max_iterations_override = agent_cfg["max_iterations"]
+    else:
+        max_iterations_override = 4  # default
 
     async def event_generator():
         loop_start = time.monotonic()
-        max_iterations = 4  # was 6 — reduced to prevent loops
+        max_iterations = max_iterations_override
         final_content = ""
         seen_tool_sigs: Dict[str, int] = {}
 

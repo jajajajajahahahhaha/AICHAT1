@@ -24,8 +24,11 @@ const state = {
   abortController: null,
   chats: [],
   models: [],
+  agents: [],
   currentModel: localStorage.getItem("kimi_model") || "moonshotai/Kimi-K2.6",
   currentMode: localStorage.getItem("kimi_mode") || "fast",
+  agentMode: localStorage.getItem("kimi_agent_mode") || "normal",  // normal | auto | <agent_id>
+  selectedAgentId: localStorage.getItem("kimi_selected_agent") || "auto",
   attachments: [],
   isOwner: localStorage.getItem("kimi_is_owner") === "1",
   username: localStorage.getItem("kimi_username") || "user",
@@ -931,6 +934,8 @@ async function streamAssistantResponse() {
         model: state.currentModel,
         mode: state.currentMode,
         attached_images: attachedImageIds,
+        agent_mode: state.agentMode || "normal",
+        agent_id: state.selectedAgentId || null,
       }),
       signal: state.abortController.signal,
     });
@@ -1075,7 +1080,161 @@ async function init() {
   initPrefs();
   initUserBlock();
   await loadModels();
+  await loadAgents();
+  initAgentUI();
   newChat();
   await loadChatsList();
 }
 init();
+
+// ============================================================
+//  Agent System UI — v3.0
+//  Toggle Switch (Normal ↔ Agent) + Agent Picker
+// ============================================================
+
+/* ---- Load agents from /api/agents ---- */
+async function loadAgents() {
+  try {
+    const res = await fetch("/api/agents");
+    const data = await res.json();
+    state.agents = data.agents || [];
+  } catch (e) {
+    console.warn("Failed to load agents", e);
+    state.agents = [];
+  }
+}
+
+/* ---- Build & wire the Agent UI ---- */
+function initAgentUI() {
+  const toggleWrap  = el("agentToggle");
+  const toggleLabel = el("agentToggleLabel");
+  const pickerWrap  = el("agentPickerWrap");
+  const selectBtn   = el("agentSelectBtn");
+  const selectLabel = el("agentSelectLabel");
+  const dropdown    = el("agentDropdown");
+
+  if (!toggleWrap) return; // guard: elements not in DOM yet
+
+  // ---- Build dropdown items ----------------------------------------
+  function buildDropdown() {
+    dropdown.innerHTML = "";
+
+    // "Auto Route" option
+    const autoOpt = document.createElement("div");
+    autoOpt.className = "agent-option auto-option" + (state.selectedAgentId === "auto" ? " selected" : "");
+    autoOpt.dataset.id = "auto";
+    autoOpt.innerHTML = `
+      <span class="agent-opt-emoji">🔀</span>
+      <div class="agent-opt-info">
+        <div class="agent-opt-name">Auto Route</div>
+        <div class="agent-opt-desc">هوش مصنوعی بهترین ایجنت رو انتخاب می‌کنه</div>
+      </div>
+      <span class="agent-opt-dot" style="background:#7c9cff"></span>`;
+    autoOpt.addEventListener("click", () => selectAgent("auto"));
+    dropdown.appendChild(autoOpt);
+
+    // Each agent
+    state.agents.forEach((a) => {
+      const opt = document.createElement("div");
+      opt.className = "agent-option" + (state.selectedAgentId === a.id ? " selected" : "");
+      opt.dataset.id = a.id;
+      opt.innerHTML = `
+        <span class="agent-opt-emoji">${a.emoji || "🤖"}</span>
+        <div class="agent-opt-info">
+          <div class="agent-opt-name">${escapeHtml(a.name)}</div>
+          <div class="agent-opt-desc">${escapeHtml(a.description_en || a.description || "")}</div>
+        </div>
+        <span class="agent-opt-dot" style="background:${a.color || "#7c9cff"}"></span>`;
+      opt.addEventListener("click", () => selectAgent(a.id));
+      dropdown.appendChild(opt);
+    });
+  }
+
+  // ---- Select an agent -----------------------------------------------
+  function selectAgent(id) {
+    state.selectedAgentId = id;
+    localStorage.setItem("kimi_selected_agent", id);
+
+    // Update button label
+    if (id === "auto") {
+      selectLabel.textContent = "Auto Route";
+    } else {
+      const agent = state.agents.find((a) => a.id === id);
+      selectLabel.textContent = agent ? `${agent.emoji} ${agent.name}` : id;
+    }
+
+    // Update dropdown selection
+    dropdown.querySelectorAll(".agent-option").forEach((opt) => {
+      opt.classList.toggle("selected", opt.dataset.id === id);
+    });
+
+    closeDropdown();
+  }
+
+  // ---- Toggle switch --------------------------------------------------
+  function setAgentMode(active) {
+    state.agentMode = active ? "auto" : "normal";
+    localStorage.setItem("kimi_agent_mode", state.agentMode);
+
+    if (active) {
+      toggleWrap.classList.add("active");
+      toggleLabel.textContent = "Agent";
+      pickerWrap.classList.add("visible");
+    } else {
+      toggleWrap.classList.remove("active");
+      toggleLabel.textContent = "Normal";
+      pickerWrap.classList.remove("visible");
+      closeDropdown();
+    }
+  }
+
+  // ---- Dropdown open/close -------------------------------------------
+  function openDropdown() {
+    buildDropdown();
+    dropdown.classList.add("open");
+    selectBtn.classList.add("open");
+  }
+
+  function closeDropdown() {
+    dropdown.classList.remove("open");
+    selectBtn.classList.remove("open");
+  }
+
+  // ---- Event listeners -----------------------------------------------
+  toggleWrap.addEventListener("click", () => {
+    const isActive = toggleWrap.classList.contains("active");
+    setAgentMode(!isActive);
+  });
+
+  selectBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (dropdown.classList.contains("open")) {
+      closeDropdown();
+    } else {
+      openDropdown();
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!e.target.closest("#agentPickerWrap")) closeDropdown();
+  });
+
+  // ---- Restore state from localStorage --------------------------------
+  const savedMode   = state.agentMode;
+  const savedAgent  = state.selectedAgentId;
+  const isActive    = savedMode !== "normal";
+
+  setAgentMode(isActive);    // sets toggle + shows picker if needed
+  selectAgent(savedAgent);   // sets label
+}
+
+// ---- Expose agent badge helper (used by renderMessage) ----------------
+function getAgentBadgeHTML() {
+  if (!state.agentMode || state.agentMode === "normal") return "";
+  if (state.selectedAgentId === "auto") {
+    return `<div class="agent-badge">🔀 Agent Mode · Auto</div>`;
+  }
+  const agent = (state.agents || []).find((a) => a.id === state.selectedAgentId);
+  if (!agent) return `<div class="agent-badge">🤖 Agent Mode</div>`;
+  return `<div class="agent-badge">${agent.emoji} ${escapeHtml(agent.name)}</div>`;
+}
