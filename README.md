@@ -1,8 +1,45 @@
-# Kimi & MiniMax Chat — v2.3
+# Kimi & MiniMax Chat — v3.0
 
 A polished ChatGPT-like AI chat interface running on **GitHub Actions**, powered by **Kimi K2.6** and **MiniMax M2.7** via a Cloudflare Worker proxy.
 
-## ✨ What's new in v2.3
+## 🚀 What's new in v3.0 — Sandbox v3
+
+The biggest upgrade since launch. The old sandbox was a tiny 30s python/bash/html
+runner — the new one is a genuine multi-language development environment:
+
+- ✅ **17 languages** — python, bash, html, **javascript (node)**, **typescript**,
+  **c**, **cpp**, **go**, **rust**, **java**, **kotlin**, **ruby**, **php**,
+  **lua**, **r**, **sql (sqlite)**, **perl** — plus `language="auto"` to
+  detect the language from a shebang.
+- ✅ **Bigger limits** — default timeout 90s (was 30s), max 300s. stdout/stderr
+  cap raised from 10 KB to 200 KB. Address-space limit configurable (default 2 GB).
+- ✅ **Persistent workspaces** — pass `workspace_id` to keep files across
+  multiple `run_code` calls in the same chat. Build a mini-project step by step.
+- ✅ **Auto-install packages** — pass `packages=["requests","pandas"]` and the
+  sandbox pip/npm/gem-installs them before running your code.
+- ✅ **stdin / env / seed files** — pipe input, inject env vars, or drop extra
+  files into the workspace (`go.mod`, `package.json`, seed CSVs…).
+- ✅ **Artifacts** — files your code produces (plots, CSVs, binaries) come back
+  as downloadable URLs; small PNGs are also embedded inline as data URLs.
+  `matplotlib.pyplot.show()` auto-saves to `plot.png`.
+- ✅ **Compile vs. runtime errors** — for compiled languages the compile step
+  is reported separately (`compile.stderr`), so debugging is precise.
+- ✅ **Resource limits** — Linux `RLIMIT_CPU` / `RLIMIT_AS` clamp runaway code.
+- ✅ **Path-traversal-safe** — workspaces are per-id sandboxes; the file
+  download endpoint refuses `../` escapes.
+- ✅ **Full backward compatibility** — the old two-arg `run_code(language, code)`
+  and its result shape (`success/stdout/stderr/returncode/language`) still work.
+
+New endpoints:
+
+| Endpoint                                                | What it does                                        |
+|---------------------------------------------------------|-----------------------------------------------------|
+| `GET  /api/sandbox/languages`                           | Returns the list of executable languages            |
+| `GET  /api/sandbox/files/{workspace_id}`                | List files inside a workspace                       |
+| `GET  /api/sandbox/files/{workspace_id}/{path}`         | Download a single artifact (inline)                 |
+| `POST /api/sandbox/sweep` (owner only)                  | Purge ephemeral workspaces older than 1 h           |
+
+## ✨ What was new in v2.3
 
 - ✅ **Model switcher (Kimi ↔ MiniMax)** — Both `moonshotai/Kimi-K2.6` and `MiniMaxAI/MiniMax-M2.7` are now first-class citizens. The frontend model picker lists both; per-request routing sends traffic to the right provider automatically.
 - ✅ **`429 rate limit exceeded: too many concurrent requests` fixed** — The client now retries `429` (and 5xx) with **exponential backoff + jitter**, and honours `Retry-After` when the upstream sends it. Applies to both streaming and non-streaming paths.

@@ -47,6 +47,43 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r backend/requirements.txt
 
+      # ----------------------------------------------------------------
+      # Sandbox v3 extra toolchains — gives run_code much broader reach.
+      # Ubuntu 24 runners already ship gcc/g++/make/perl/php/ruby/python3
+      # and Node 20; we top up with go / rust / lua / R / kotlin and pin
+      # the numeric/data-science python stack so charts and CSV work OOTB.
+      # ----------------------------------------------------------------
+      - name: Install sandbox v3 toolchains
+        run: |
+          set -e
+          echo "::group::apt packages"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential gcc g++ make \
+            golang-go rustc cargo \
+            default-jdk kotlin \
+            lua5.4 r-base-core \
+            php-cli ruby ruby-dev \
+            sqlite3 jq curl wget \
+            fonts-dejavu \
+            > /dev/null
+          echo "::endgroup::"
+
+          echo "::group::python data-science stack"
+          pip install --quiet --no-input \
+            numpy pandas matplotlib scipy scikit-learn \
+            requests beautifulsoup4 lxml pillow openpyxl
+          echo "::endgroup::"
+
+          echo "::group::node.js version check"
+          node --version || true
+          npm --version || true
+          echo "::endgroup::"
+
+          echo "::group::sandbox self-check"
+          python3 -c "from backend.tools.sandbox import SUPPORTED_LANGUAGES; print('sandbox v3 languages:', SUPPORTED_LANGUAGES)"
+          echo "::endgroup::"
+
       - name: Verify required secrets
         run: |
           missing=()

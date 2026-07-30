@@ -480,6 +480,244 @@ def test_upload_image_endpoint_accepts_octet_stream():
     print("✓ /api/upload/image accepts octet-stream + rejects non-images OK")
 
 
+# ---------------------------------------------------------------------------
+# v3.0 sandbox tests — multi-language, packages, workspace, artifacts, limits
+# ---------------------------------------------------------------------------
+
+def test_sandbox_v3_supported_languages():
+    """v3 must advertise at least the core language set."""
+    from backend.tools.sandbox import SUPPORTED_LANGUAGES
+    core = {"python", "bash", "html", "javascript", "typescript", "c", "cpp",
+            "go", "rust", "java", "ruby", "php", "lua", "r", "sql", "perl"}
+    missing = core - set(SUPPORTED_LANGUAGES)
+    assert not missing, f"sandbox v3 missing languages: {missing}"
+    print(f"✓ sandbox v3 advertises {len(SUPPORTED_LANGUAGES)} languages")
+
+
+def test_sandbox_v3_shape_backward_compat():
+    """v3 result must still expose ALL v2 fields (success/stdout/stderr/returncode/language)."""
+    from backend.tools.sandbox import run_code
+    r = asyncio.run(run_code("python", "print(2+2)"))
+    for k in ("success", "stdout", "stderr", "returncode", "language"):
+        assert k in r, f"v2-compat key missing: {k}"
+    # v3-only additive fields
+    for k in ("elapsed", "workspace_id", "files", "timed_out", "truncated"):
+        assert k in r, f"v3 additive key missing: {k}"
+    assert r["success"] is True and "4" in r["stdout"]
+    print("✓ sandbox v3 keeps v2 result shape (additive-only upgrade)")
+
+
+def test_sandbox_v3_alias_and_auto():
+    """Aliases (py, js, sh) must resolve, and language='auto' must work off a shebang."""
+    from backend.tools.sandbox import run_code
+    r = asyncio.run(run_code("py", "print('hi')"))
+    assert r["success"] and r["language"] == "python"
+    r2 = asyncio.run(run_code("sh", "echo aliased"))
+    assert r2["success"] and r2["language"] == "bash"
+    r3 = asyncio.run(run_code("auto", "#!/usr/bin/env python3\nprint('autolang')"))
+    assert r3["success"] and r3["language"] == "python"
+    # unknown alias → structured error
+    r4 = asyncio.run(run_code("klingon", "whatever"))
+    assert r4["success"] is False and "Unsupported" in r4.get("error", "")
+    print("✓ sandbox v3 language aliases + auto-detect OK")
+
+
+def test_sandbox_v3_stdin():
+    """Stdin must reach the program."""
+    from backend.tools.sandbox import run_code
+    r = asyncio.run(run_code(
+        "python",
+        "import sys\nprint('got:', sys.stdin.read().strip())",
+        stdin="pipe-me-in",
+    ))
+    assert r["success"], r
+    assert "pipe-me-in" in r["stdout"]
+    print("✓ sandbox v3 stdin OK")
+
+
+def test_sandbox_v3_env_vars():
+    """Custom env vars must be visible; unsafe names must be dropped silently."""
+    from backend.tools.sandbox import run_code
+    r = asyncio.run(run_code(
+        "python",
+        "import os\nprint('K1=', os.environ.get('MY_VAR', '?'))",
+        env={"MY_VAR": "forty-two", "bad name": "nope", "lowercase": "nope"},
+    ))
+    assert r["success"] and "forty-two" in r["stdout"]
+    print("✓ sandbox v3 env-var passing OK")
+
+
+def test_sandbox_v3_workspace_persistence():
+    """A named workspace must retain files between two independent run_code calls."""
+    from backend.tools.sandbox import run_code, list_workspace_files
+    ws = "pytest_ws_" + os.urandom(3).hex()
+    r1 = asyncio.run(run_code(
+        "python",
+        "open('data.txt','w').write('persisted\\n')",
+        workspace_id=ws,
+    ))
+    assert r1["success"] and r1["workspace_id"] == ws
+    # New call, same ws — file must still be there
+    r2 = asyncio.run(run_code(
+        "python",
+        "print(open('data.txt').read().strip())",
+        workspace_id=ws,
+    ))
+    assert r2["success"] and "persisted" in r2["stdout"], r2
+    listing = list_workspace_files(ws)
+    assert any(f["path"] == "data.txt" for f in listing)
+    print("✓ sandbox v3 persistent workspace OK")
+
+
+def test_sandbox_v3_artifact_detection():
+    """Files created during a run must appear in `files` with mime + size."""
+    from backend.tools.sandbox import run_code
+    r = asyncio.run(run_code(
+        "python",
+        "open('report.csv','w').write('a,b\\n1,2\\n')",
+    ))
+    assert r["success"]
+    paths = [f["path"] for f in r.get("files", [])]
+    assert "report.csv" in paths, paths
+    csv = [f for f in r["files"] if f["path"] == "report.csv"][0]
+    assert csv["size"] > 0 and csv["mime"] in ("text/csv", "application/octet-stream")
+    print("✓ sandbox v3 artifact detection OK")
+
+
+def test_sandbox_v3_files_seed():
+    """Pre-seeded `files` must be dropped into the workspace before the run."""
+    from backend.tools.sandbox import run_code
+    r = asyncio.run(run_code(
+        "python",
+        "print(open('config.json').read().strip())",
+        files={"config.json": '{"seeded": true}'},
+    ))
+    assert r["success"] and '"seeded": true' in r["stdout"]
+    print("✓ sandbox v3 file-seeding OK")
+
+
+def test_sandbox_v3_timeout_respected():
+    """A caller-supplied short timeout must actually kill the process."""
+    from backend.tools.sandbox import run_code
+    r = asyncio.run(run_code(
+        "python",
+        "import time\ntime.sleep(10)\nprint('should not appear')",
+        timeout=2,
+    ))
+    assert r["success"] is False
+    assert r.get("timed_out") is True
+    print("✓ sandbox v3 timeout enforcement OK")
+
+
+def test_sandbox_v3_read_workspace_file_traversal():
+    """read_workspace_file must refuse path-traversal attempts."""
+    from backend.tools.sandbox import run_code, read_workspace_file
+    ws = "pytest_trav_" + os.urandom(3).hex()
+    asyncio.run(run_code("python", "open('safe.txt','w').write('ok')", workspace_id=ws))
+    # Valid path
+    got = read_workspace_file(ws, "safe.txt")
+    assert got is not None and got[0] == b"ok"
+    # Traversal attempts
+    assert read_workspace_file(ws, "../../../../etc/passwd") is None
+    assert read_workspace_file(ws, "../.gitignore") is None
+    print("✓ sandbox v3 path-traversal guard OK")
+
+
+def test_sandbox_v3_unsafe_package_name_rejected():
+    """Package names with shell metacharacters must be refused before install."""
+    from backend.tools.sandbox import run_code
+    r = asyncio.run(run_code(
+        "python",
+        "print('hi')",
+        packages=["good_pkg", "; rm -rf /"],
+    ))
+    assert r["success"] is False
+    assert "unsafe package name" in (r.get("install", {}).get("error", "") + r.get("error", ""))
+    print("✓ sandbox v3 package-name safety OK")
+
+
+def test_sandbox_v3_javascript_when_available():
+    """Node.js is present on the Actions runner; if here too, JS should just work."""
+    import shutil as _sh
+    from backend.tools.sandbox import run_code
+    if not _sh.which("node"):
+        print("⚠  node not installed on this host — skipping JS test")
+        return
+    r = asyncio.run(run_code("javascript", "console.log('js-'+ (1+2))"))
+    assert r["success"] and "js-3" in r["stdout"], r
+    print("✓ sandbox v3 javascript OK")
+
+
+def test_sandbox_v3_compiled_c_when_available():
+    """If gcc is installed, C code must compile and run."""
+    import shutil as _sh
+    from backend.tools.sandbox import run_code
+    if not _sh.which("gcc"):
+        print("⚠  gcc not installed on this host — skipping C test")
+        return
+    r = asyncio.run(run_code(
+        "c",
+        '#include <stdio.h>\nint main(){printf("c-ok %d\\n", 42);return 0;}',
+    ))
+    assert r["success"], r
+    assert "c-ok 42" in r["stdout"]
+    assert "compile" in r and r["compile"]["returncode"] == 0
+    print("✓ sandbox v3 C compile+run OK")
+
+
+def test_sandbox_v3_compile_failure_surfaced():
+    """A compile error must surface as success=False with compile.stderr populated."""
+    import shutil as _sh
+    from backend.tools.sandbox import run_code
+    if not _sh.which("gcc"):
+        print("⚠  gcc not installed — skipping compile-error test")
+        return
+    r = asyncio.run(run_code("c", "int main(){ return this_symbol_does_not_exist; }"))
+    assert r["success"] is False
+    assert "compile" in r and r["compile"]["returncode"] != 0
+    assert r["compile"]["stderr"], "compiler must report an error message"
+    print("✓ sandbox v3 compile-failure separation OK")
+
+
+def test_sandbox_v3_tool_definition_includes_new_params():
+    """TOOL_DEFINITIONS must expose the new run_code kwargs to the model."""
+    from backend.tools import TOOL_DEFINITIONS
+    run_code_def = next(t for t in TOOL_DEFINITIONS
+                       if t["function"]["name"] == "run_code")
+    props = run_code_def["function"]["parameters"]["properties"]
+    for k in ("timeout", "stdin", "packages", "workspace_id", "env", "files"):
+        assert k in props, f"run_code tool definition missing param: {k}"
+    # Description must mention the new capability so the model knows about it.
+    desc = run_code_def["function"]["description"].lower()
+    assert "python" in desc and "javascript" in desc and "go" in desc
+    print("✓ sandbox v3 tool definition exposes new params")
+
+
+def test_sandbox_v3_dedupe_treats_stdin_as_distinct():
+    """Same code + different stdin must not be treated as a duplicate call."""
+    from backend.server import _tool_signature
+    a = _tool_signature("run_code",
+                        {"language": "python", "code": "print(1)", "stdin": "a"})
+    b = _tool_signature("run_code",
+                        {"language": "python", "code": "print(1)", "stdin": "b"})
+    assert a != b, "different stdin must produce different signatures"
+    print("✓ sandbox v3 signature honours stdin/packages/workspace")
+
+
+def test_sandbox_v3_new_routes_present():
+    """New /api/sandbox/* routes must be registered."""
+    from backend.server import app
+    paths = {r.path for r in app.routes}
+    for expected in (
+        "/api/sandbox/languages",
+        "/api/sandbox/files/{workspace_id}",
+        "/api/sandbox/files/{workspace_id}/{path:path}",
+        "/api/sandbox/sweep",
+    ):
+        assert expected in paths, f"missing new route: {expected}"
+    print("✓ sandbox v3 API routes registered")
+
+
 if __name__ == "__main__":
     test_auth_module()
     test_tools_signature_dedup()
@@ -504,4 +742,22 @@ if __name__ == "__main__":
     test_chat_stream_attaches_image_marker_not_data_url()
     test_chat_stream_only_attaches_current_turn_images()
     test_chat_stream_handles_rehydrated_multimodal_content()
+    # v3.0 sandbox regression tests
+    test_sandbox_v3_supported_languages()
+    test_sandbox_v3_shape_backward_compat()
+    test_sandbox_v3_alias_and_auto()
+    test_sandbox_v3_stdin()
+    test_sandbox_v3_env_vars()
+    test_sandbox_v3_workspace_persistence()
+    test_sandbox_v3_artifact_detection()
+    test_sandbox_v3_files_seed()
+    test_sandbox_v3_timeout_respected()
+    test_sandbox_v3_read_workspace_file_traversal()
+    test_sandbox_v3_unsafe_package_name_rejected()
+    test_sandbox_v3_javascript_when_available()
+    test_sandbox_v3_compiled_c_when_available()
+    test_sandbox_v3_compile_failure_surfaced()
+    test_sandbox_v3_tool_definition_includes_new_params()
+    test_sandbox_v3_dedupe_treats_stdin_as_distinct()
+    test_sandbox_v3_new_routes_present()
     print("\nALL TESTS PASSED ✅")

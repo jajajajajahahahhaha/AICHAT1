@@ -1,8 +1,24 @@
 """Tool implementations for Kimi Chat."""
 from .search import web_search
-from .sandbox import run_code
+from .sandbox import run_code, SUPPORTED_LANGUAGES
 from .vision import analyze_image
 from .image_gen import generate_image
+
+# The sandbox now speaks 17 languages. Keep the string short so it fits in the
+# tool definition without bloating every request; the full list is at
+# SUPPORTED_LANGUAGES.
+_SANDBOX_LANG_DESCRIPTION = (
+    "Execute code in a secure multi-language sandbox. Supported: "
+    + ", ".join(SUPPORTED_LANGUAGES)
+    + ", plus 'auto' to detect from a shebang. "
+    "Compiled languages (c, cpp, go, rust, java, kotlin) are built then run. "
+    "SQL runs against a local SQLite DB (sandbox.db). HTML is rendered client-side. "
+    "Any files the code creates (plots, CSVs, binaries) come back in `files` with "
+    "download URLs; small images are additionally embedded as data_url so they can be "
+    "shown inline. matplotlib.pyplot.show() auto-saves to plot.png. Persistent "
+    "workspaces let you keep files across calls in the same chat."
+)
+
 
 TOOL_DEFINITIONS = [
     {
@@ -24,12 +40,61 @@ TOOL_DEFINITIONS = [
         "type": "function",
         "function": {
             "name": "run_code",
-            "description": "Execute code in a secure sandbox. Supports Python, Bash, and HTML. Use this to run/test code, verify output, or debug scripts the user provides or you generate.",
+            "description": _SANDBOX_LANG_DESCRIPTION,
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "language": {"type": "string", "enum": ["python", "bash", "html"]},
-                    "code": {"type": "string", "description": "The code to execute."},
+                    "language": {
+                        "type": "string",
+                        "description": (
+                            "Language identifier: python, bash, html, javascript, "
+                            "typescript, c, cpp, go, rust, java, kotlin, ruby, php, "
+                            "lua, r, sql, perl — or 'auto' to detect from a shebang."
+                        ),
+                    },
+                    "code": {"type": "string", "description": "The source code to execute."},
+                    "timeout": {
+                        "type": "integer",
+                        "description": "Timeout in seconds (default 90, max 300).",
+                    },
+                    "stdin": {
+                        "type": "string",
+                        "description": "Optional text piped to the program's stdin.",
+                    },
+                    "packages": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": (
+                            "Optional list of packages to install BEFORE running: "
+                            "pip pkgs for python, npm pkgs for javascript/typescript, "
+                            "gems for ruby. Example: ['requests', 'beautifulsoup4']."
+                        ),
+                    },
+                    "workspace_id": {
+                        "type": "string",
+                        "description": (
+                            "Optional persistent workspace id — reuse across calls in the "
+                            "same chat to keep files (data, outputs, package caches) between runs."
+                        ),
+                    },
+                    "env": {
+                        "type": "object",
+                        "description": "Optional extra environment variables (UPPER_SNAKE_CASE names only).",
+                        "additionalProperties": {"type": "string"},
+                    },
+                    "files": {
+                        "type": "object",
+                        "description": (
+                            "Optional additional source files to drop into the workspace "
+                            "before running, keyed by relative path. Useful for multi-file "
+                            "projects, config files (package.json, go.mod), or seed data."
+                        ),
+                        "additionalProperties": {"type": "string"},
+                    },
+                    "memory_mb": {
+                        "type": "integer",
+                        "description": "Address-space limit in MB (default 2048).",
+                    },
                 },
                 "required": ["language", "code"],
             },
@@ -68,4 +133,11 @@ TOOL_DEFINITIONS = [
     },
 ]
 
-__all__ = ["web_search", "run_code", "analyze_image", "generate_image", "TOOL_DEFINITIONS"]
+__all__ = [
+    "web_search",
+    "run_code",
+    "analyze_image",
+    "generate_image",
+    "TOOL_DEFINITIONS",
+    "SUPPORTED_LANGUAGES",
+]

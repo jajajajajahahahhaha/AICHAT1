@@ -28,7 +28,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from backend.kimi_client import KimiClient, KimiAPIError, AVAILABLE_MODELS
 from backend.tools import TOOL_DEFINITIONS
 from backend.tools.search import web_search
-from backend.tools.sandbox import run_code
+from backend.tools.sandbox import (
+    run_code,
+    SUPPORTED_LANGUAGES,
+    list_workspace_files,
+    read_workspace_file,
+    sweep_old_workspaces,
+)
 from backend.tools.vision import analyze_image, store_image, get_image
 from backend.tools.image_gen import generate_image
 from backend import auth
@@ -212,7 +218,19 @@ async def execute_tool(name: str, args: Dict[str, Any], *, model: Optional[str] 
         if name == "web_search":
             return await web_search(args.get("query", ""), int(args.get("max_results", 5)))
         if name == "run_code":
-            return await run_code(args.get("language", "python"), args.get("code", ""))
+            # v3 sandbox accepts a rich set of optional kwargs; only forward
+            # the ones the caller actually provided so old models sending only
+            # {language, code} keep working exactly like v2.
+            sb_kwargs: Dict[str, Any] = {}
+            for opt in ("timeout", "stdin", "env", "packages",
+                        "workspace_id", "cpu_seconds", "memory_mb", "files"):
+                if opt in args and args[opt] not in (None, ""):
+                    sb_kwargs[opt] = args[opt]
+            return await run_code(
+                args.get("language", "python"),
+                args.get("code", ""),
+                **sb_kwargs,
+            )
         if name == "analyze_image":
             # Pass through the currently-selected model so vision picks the
             # right route (Kimi vs MiniMax) and auto-falls-back to a
@@ -256,7 +274,15 @@ def _tool_signature(name: str, args: Dict[str, Any]) -> str:
             key_fields = {"query": (args.get("query") or "").strip().lower()}
         elif name == "run_code":
             code = (args.get("code") or "").strip()
-            key_fields = {"language": args.get("language"), "code_hash": hash(code)}
+            key_fields = {
+                "language": args.get("language"),
+                "code_hash": hash(code),
+                # New in v3: same code but different stdin/packages/workspace is
+                # actually a distinct call and must NOT be treated as a duplicate.
+                "stdin_hash": hash((args.get("stdin") or "").strip()),
+                "packages": tuple(sorted(args.get("packages") or [])),
+                "workspace_id": args.get("workspace_id") or "",
+            }
         elif name == "analyze_image":
             key_fields = {"image_id": args.get("image_id"), "question": (args.get("question") or "").strip().lower()}
         elif name == "generate_image":
@@ -392,7 +418,7 @@ async def chat_stream(req: ChatRequest, authorization: Optional[str] = Header(No
                     "\n\nYou have four tools:"
                     "\n  • web_search(query, max_results) — DuckDuckGo. Use for CURRENT / RECENT facts, news, prices, versions."
                     " Do NOT call it more than TWICE per user turn. Do NOT re-issue the same query. If the results are enough, STOP searching and answer."
-                    "\n  • run_code(language, code) — Python / Bash / HTML sandbox. Use to run/verify snippets, do math, test scripts."
+                    "\n  • run_code(language, code, [timeout, stdin, packages, workspace_id, env, files, memory_mb]) — Multi-language sandbox. Languages: python, bash, html, javascript, typescript, c, cpp, go, rust, java, kotlin, ruby, php, lua, r, sql, perl (or 'auto' to detect from a shebang). Use to run/verify code, do math, generate charts, work with data. `packages` (list) installs pip/npm/gem packages before running. `workspace_id` (a stable string per chat) keeps files between calls so you can build a small project step by step. Files your code creates (plots, CSVs, binaries) come back in `files` with URLs the user can download; small PNGs are embedded as data URLs and rendered inline. matplotlib.pyplot.show() auto-saves to plot.png."
                     "\n  • analyze_image(image_id, question) — Detailed vision / OCR on an uploaded image. **You MUST call this tool whenever the user attaches an image OR asks anything about the content of an attached image** (\"what's in this?\", \"read this text\", \"describe it\", \"translate the text\", \"how many people\", \"is this X or Y\"). Pass the exact image_id you were told (starts with `img_`, appears inside `[IMAGE_ATTACHED: img_xxx]` markers in the user message). Do NOT guess what the image contains — always call the tool first. Never claim \"I didn't receive an image\" — if you see an [IMAGE_ATTACHED: ...] marker the image IS available; call analyze_image with that id."
                     "\n  • generate_image(prompt, width, height) — Create NEW images from a text prompt using Pollinations.ai."
                     "\n\nIMPORTANT — image creation:"
@@ -772,8 +798,64 @@ async def api_generate_image(req: ImageGenRequest, authorization: Optional[str] 
 
 @app.post("/api/run")
 async def api_run(payload: Dict[str, Any], authorization: Optional[str] = Header(None)):
+    """Manual sandbox runner used by the frontend "Run" button.
+
+    Accepts the full v3 sandbox param set — any missing field falls back to
+    the sandbox's own defaults, so the legacy `{language, code}` payload still
+    works unchanged.
+    """
     require_user(authorization)
-    return await run_code(payload.get("language", "python"), payload.get("code", ""))
+    sb_kwargs: Dict[str, Any] = {}
+    for opt in ("timeout", "stdin", "env", "packages",
+                "workspace_id", "cpu_seconds", "memory_mb", "files"):
+        if opt in payload and payload[opt] not in (None, ""):
+            sb_kwargs[opt] = payload[opt]
+    return await run_code(
+        payload.get("language", "python"),
+        payload.get("code", ""),
+        **sb_kwargs,
+    )
+
+
+@app.get("/api/sandbox/languages")
+async def api_sandbox_languages():
+    """Return the list of languages the sandbox can execute."""
+    return {"languages": SUPPORTED_LANGUAGES}
+
+
+@app.get("/api/sandbox/files/{workspace_id}")
+async def api_sandbox_list_files(workspace_id: str,
+                                 authorization: Optional[str] = Header(None)):
+    """List files inside a sandbox workspace so the UI can render a file tree."""
+    require_user(authorization)
+    return {"workspace_id": workspace_id,
+            "files": list_workspace_files(workspace_id)}
+
+
+@app.get("/api/sandbox/files/{workspace_id}/{path:path}")
+async def api_sandbox_download(workspace_id: str, path: str,
+                               authorization: Optional[str] = Header(None)):
+    """Download a single file from a sandbox workspace."""
+    require_user(authorization)
+    result = read_workspace_file(workspace_id, path)
+    if result is None:
+        raise HTTPException(404, "file not found")
+    data, mime = result
+    return StreamingResponse(
+        iter([data]),
+        media_type=mime,
+        headers={"Content-Disposition": f'inline; filename="{Path(path).name}"'},
+    )
+
+
+@app.post("/api/sandbox/sweep")
+async def api_sandbox_sweep(authorization: Optional[str] = Header(None)):
+    """Remove ephemeral workspaces older than 1h (owner-only)."""
+    user = require_user(authorization)
+    if not user["is_owner"]:
+        raise HTTPException(403, "Owner only")
+    n = sweep_old_workspaces()
+    return {"ok": True, "removed": n}
 
 
 # ---------- Rehydrate on-disk images into in-memory store (survive restarts) ----------
