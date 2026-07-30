@@ -833,6 +833,112 @@ async function regenerate() {
 }
 
 /**
+ * Smooth typewriter renderer — drains an incoming char buffer at a constant
+ * rate (≈35 chars/sec) so the assistant reply appears to *type itself* live,
+ * ChatGPT-style, instead of popping in at whatever irregular chunk sizes the
+ * upstream sends. Each newly-typed slice gets a short fade-in via the
+ * `.stream-fresh` span so the growth reads as buttery-soft, not staccato.
+ *
+ *   feed(text)  → append to internal buffer, start the loop if idle
+ *   flush()     → drain everything immediately (called at `done`)
+ *   stop()      → cancel the loop (called on abort / cleanup)
+ *   getRendered()→ current on-screen text (for saving to state)
+ */
+function createSmoothTyper(contentEl, opts = {}) {
+  const charsPerSecond = opts.charsPerSecond || 35;
+  let buffer = "";        // pending chars waiting to be typed
+  let rendered = "";      // chars already committed to the DOM
+  let rafId = null;
+  let lastTs = 0;
+  let carry = 0;          // fractional-char accumulator (for sub-frame accuracy)
+  let finished = false;
+
+  function paint(freshTail) {
+    // Render the whole accumulated text as markdown, then append a small
+    // "fresh" span that carries only the very last slice so it can fade in
+    // softly on top of the already-settled prefix. A blinking cursor at the
+    // end keeps the ChatGPT feel.
+    const safeMain = renderMarkdown(rendered.slice(0, rendered.length - freshTail.length));
+    const safeFresh = renderMarkdown(freshTail);
+    // Strip trailing <p> wrapping if the fresh tail is tiny — we want the
+    // fade span to sit inline, not on its own line.
+    const inlineFresh = safeFresh.replace(/^<p>([\s\S]*)<\/p>\s*$/, "$1");
+    contentEl.innerHTML =
+      safeMain +
+      `<span class="stream-fresh">${inlineFresh}</span>` +
+      `<span class="cursor-blink"></span>`;
+  }
+
+  function tick(ts) {
+    if (!lastTs) lastTs = ts;
+    const dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    carry += dt * charsPerSecond;
+    let toEmit = Math.floor(carry);
+    if (toEmit > 0 && buffer.length > 0) {
+      // If the buffer is growing faster than we can drain (e.g. long backlog
+      // after tool call), gently speed up so we never lag more than ~500ms
+      // behind. This keeps things tight without ruining the smooth feel.
+      if (buffer.length > charsPerSecond * 0.8) {
+        toEmit = Math.min(buffer.length, toEmit + Math.ceil(buffer.length * 0.05));
+      }
+      const slice = buffer.slice(0, toEmit);
+      buffer = buffer.slice(toEmit);
+      rendered += slice;
+      carry -= toEmit;
+      // The "fresh" tail is the last ~12 chars — small enough to fade nicely,
+      // big enough to feel alive.
+      const tailLen = Math.min(rendered.length, 12);
+      paint(rendered.slice(rendered.length - tailLen));
+      scrollToBottom();
+    }
+    if (buffer.length > 0) {
+      rafId = requestAnimationFrame(tick);
+    } else {
+      rafId = null;
+      lastTs = 0;
+      if (finished) {
+        // Nothing more will come — settle the DOM cleanly (no fresh span).
+        contentEl.innerHTML = renderMarkdown(rendered) + '<span class="cursor-blink"></span>';
+      }
+    }
+  }
+
+  return {
+    feed(text) {
+      if (!text) return;
+      buffer += text;
+      if (rafId == null) {
+        lastTs = 0;
+        rafId = requestAnimationFrame(tick);
+      }
+    },
+    flush() {
+      // Drain everything right now — used on the `done` event so we don't
+      // leave the last few chars unwritten after the stream ends.
+      if (buffer.length) {
+        rendered += buffer;
+        buffer = "";
+      }
+      if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+      contentEl.innerHTML = renderMarkdown(rendered);
+    },
+    stop() {
+      if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+    },
+    finish() {
+      finished = true;
+      // Kick the loop one more time so it can settle if the buffer is empty.
+      if (rafId == null) {
+        lastTs = 0;
+        rafId = requestAnimationFrame(tick);
+      }
+    },
+    getRendered() { return rendered + buffer; },
+  };
+}
+
+/**
  * Streams a fresh assistant reply. Rebuilds the api-messages array from
  * state.messages every call — this is critical: a stale, growing apiMessages
  * was the reason the second message never rendered in v2.0.
@@ -923,6 +1029,7 @@ async function streamAssistantResponse() {
   let accumulated = "";
   let errored = false;
   let gotAnything = false;
+  let typer = null;  // lazy — only created once the first delta arrives
 
   try {
     const res = await fetch("/api/chat/stream", {
@@ -972,7 +1079,10 @@ async function streamAssistantResponse() {
           gotAnything = true;
           removeThinking();
           accumulated += data.content;
-          contentEl.innerHTML = renderMarkdown(accumulated) + '<span class="cursor-blink"></span>';
+          // Feed the smooth typer instead of instantly re-rendering. This turns
+          // chunky server bursts into a steady, ChatGPT-style live typing feel.
+          if (!typer) typer = createSmoothTyper(contentEl, { charsPerSecond: 35 });
+          typer.feed(data.content);
         } else if (eventName === "tool_call") {
           gotAnything = true;
           removeThinking();
@@ -997,6 +1107,12 @@ async function streamAssistantResponse() {
         } else if (eventName === "done") {
           gotAnything = true;
           removeThinking();
+          // Let the typer drain whatever's still queued in its buffer, then
+          // settle the DOM (drops the cursor + fresh span, re-enhances code).
+          if (typer) { typer.finish(); }
+          // Give the typer a moment to visually catch up before final polish.
+          await new Promise((r) => setTimeout(r, 40));
+          if (typer) { typer.flush(); }
           contentEl.innerHTML = renderMarkdown(accumulated);
           enhanceCodeBlocks(contentEl);
         } else if (eventName === "error") {
@@ -1020,6 +1136,10 @@ async function streamAssistantResponse() {
     }
   } finally {
     removeThinking();
+    // Make sure the typewriter is fully drained and torn down before we
+    // touch the DOM — otherwise a stray requestAnimationFrame could rewrite
+    // contentEl.innerHTML *after* enhanceCodeBlocks(), killing copy buttons.
+    if (typer) { typer.flush(); typer.stop(); }
     state.streaming = false;
     state.abortController = null;
     updateSendBtn();
@@ -1033,6 +1153,7 @@ async function streamAssistantResponse() {
       contentEl.innerHTML = `<em style="color:var(--text-dim)">${t("emptyReply")}</em>`;
     } else {
       // Finalise codeblocks post-stream
+      contentEl.innerHTML = renderMarkdown(accumulated);
       enhanceCodeBlocks(contentEl);
     }
     await saveChat();

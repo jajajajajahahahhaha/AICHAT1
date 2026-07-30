@@ -512,6 +512,35 @@ select { appearance: none; -webkit-appearance: none; background-image: url("data
 }
 @keyframes blink { 50% { opacity: 0; } }
 
+/* ============================================================
+   Smooth streaming typewriter — v2.4
+   Newly-typed characters fade in over ~120ms so the growth
+   of the assistant reply reads as buttery-soft live typing,
+   ChatGPT-style — no chunky pop-in from irregular server bursts.
+   ============================================================ */
+.stream-fresh {
+  display: inline;
+  animation: streamFadeIn 160ms var(--ease-out);
+  /* Very subtle color shift so the newest chars "land" softly
+     onto the settled text without any visible flash. */
+  will-change: opacity, filter;
+}
+@keyframes streamFadeIn {
+  from {
+    opacity: 0;
+    filter: blur(0.6px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+/* Respect the OS-level "reduce motion" preference — the fade is
+   purely decorative, so disable it if the user has asked for less. */
+@media (prefers-reduced-motion: reduce) {
+  .stream-fresh { animation: none; }
+}
+
 /* User message bubble */
 .message-row.user .message-body {
   background: var(--bg-message-user);
