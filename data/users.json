@@ -16,11 +16,5 @@
     "password_hash": "$2b$12$xAKlDX4BX/RgsIj1O2j0pOKg8d3n.cx.62k1kUPobgtgi11xgOfsu",
     "is_owner": true,
     "created_at": 1784683735.300769
-  },
-  "JJjsjsj": {
-    "username": "JJjsjsj",
-    "password_hash": "$2b$12$RgEm8syc5TTwfpxQlfFM8e1lBHnRjpL7B8JeyZ0yLSgZARsVOwq5.",
-    "is_owner": false,
-    "created_at": 1785274258.6247487
   }
 }
