@@ -1,0 +1,31 @@
+{
+  "id": "chat_ms986oui7zq1",
+  "title": "یه کد ساده با زبان go بنویس قبلش توی سند باکس تست",
+  "messages": [
+    {
+      "role": "user",
+      "content": "یه کد ساده با زبان go بنویس قبلش توی سند باکس تست کن ببین باگ نداره",
+      "display_content": "یه کد ساده با زبان go بنویس قبلش توی سند باکس تست کن ببین باگ نداره",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " اول کد رو توی sandbox اجرا می‌کنم تا مطمئن بشم بدون مشکل کار می‌کنه. ",
+      "tool_events": [
+        {
+          "name": "run_code",
+          "args": {
+            "language": "go",
+            "code": "package main\n\nimport (\n\t\"fmt\"\n)\n\n// Sum دو عدد رو جمع می‌زنه\nfunc Sum(a, b int) int {\n\treturn a + b\n}\n\n// Factorial فاکتوریل یک عدد غیرمنفی رو حساب می‌کنه\nfunc Factorial(n int) int {\n\tif n < 0 {\n\t\treturn -1\n\t}\n\tif n == 0 {\n\t\treturn 1\n\t}\n\tresult := 1\n\tfor i := 2; i <= n; i++ {\n\t\tresult *= i\n\t}\n\treturn result\n}\n\nfunc main() {\n\tfmt.Println(\"=== تست تابع Sum ===\")\n\tfmt.Printf(\"Sum(3, 5) = %d (انتظار: 8)\\n\", Sum(3, 5))\n\tfmt.Printf(\"Sum(-2, 10) = %d (انتظار: 8)\\n\", Sum(-2, 10))\n\n\tfmt.Println(\"\\n=== تست تابع Factorial ===\")\n\tfor i := 0; i <= 5; i++ {\n\t\tfmt.Printf(\"Factorial(%d) = %d\\n\", i, Factorial(i))\n\t}\n\n\t// چک‌های ساده (assertion)\n\tpassed := true\n\tif Sum(2, 2) != 4 {\n\t\tfmt.Println(\"❌ خطا: Sum(2,2)\")\n\t\tpassed = false\n\t} else {\n\t\tfmt.Println(\"✅ Sum(2,2) درسته\")\n\t}\n\n\tif Factorial(5) != 120 {\n\t\tfmt.Println(\"❌ خطا: Factorial(5)\")\n\t\tpassed = false\n\t} else {\n\t\tfmt.Println(\"✅ Factorial(5) درسته\")\n\t}\n\n\tif Factorial(0) != 1 {\n\t\tfmt.Println(\"❌ خطا: Factorial(0)\")\n\t\tpassed = false\n\t} else {\n\t\tfmt.Println(\"✅ Factorial(0) درسته\")\n\t}\n\n\tif passed {\n\t\tfmt.Println(\"\\n🎉 همه تست‌ها با موفقیت پاس شدند!\")\n\t} else {\n\t\tfmt.Println(\"\\n⚠️ بعضی تست‌ها ناموفق بودند.\")\n\t}\n}\n"
+          },
+          "id": "functions.run_code:0",
+          "summary": "go • package main"
+        }
+      ],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785519561.5605159
+}
