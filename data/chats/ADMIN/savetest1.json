@@ -1,0 +1,15 @@
+{
+  "id": "savetest1",
+  "title": "My first chat",
+  "messages": [
+    {
+      "role": "user",
+      "content": "hello"
+    },
+    {
+      "role": "assistant",
+      "content": "hi!"
+    }
+  ],
+  "updated_at": 1784710061.9516551
+}

@@ -1,0 +1,40 @@
+{
+  "id": "chat_ms50by08ycnj",
+  "title": "Search the web for the latest AI news in 2026",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Search the web for the latest AI news in 2026",
+      "display_content": "Search the web for the latest AI news in 2026",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " Here are the latest AI news highlights for **2026**:\n\n## 🔥 Major Headlines\n\n**1. Google I/O 2026 — 100 Announcements**\nGoogle unveiled a massive wave of new AI models, agents, and tools at their annual I/O conference. CEO Sundar Pichai highlighted innovations spanning search, creation, discovery, shopping, and productivity.\n\n**2. July 2026 AI Release Wave — 27 New Launches**\nA busy month saw launches from all major players:\n- **OpenAI**\n- **Anthropic**\n- **Google DeepMind**\n- **Meta AI**\n\nThese covered frontier models, AI agents, open-source projects, and coding tools.\n\n**3. Anthropic Releases Claude Opus 5**\nOn **July 24, 2026**, Anthropic dropped **Claude Opus 5**, their latest frontier model, marking a significant milestone in the AI race.\n\n## 📊 Companies to Watch in 2026\nThe AI landscape is being shaped by:\n- OpenAI\n- Anthropic\n- Google DeepMind\n- Meta\n- xAI (Elon Musk)\n- DeepSeek\n- Mistral\n- Moonshot AI\n\n## 📰 Good Sources to Follow\n- [AI News](https://www.artificialintelligence-news.com/)\n- [ThursdAI News](https://thursdai.news/)\n- [AI Release Tracker](https://aireleasetracker.com/latest)\n- [Times of AI](https://www.timesofai.com/news/ai/)\n\n---\n\nWould you like me to search for news about a **specific company** (e.g., OpenAI, Google, Anthropic) or a **specific topic** (e.g., AI agents, coding models, open-source AI)?",
+      "tool_events": [
+        {
+          "name": "web_search",
+          "args": {
+            "query": "latest AI news 2026",
+            "max_results": 5
+          },
+          "id": "functions.web_search:0",
+          "summary": "latest AI news 2026"
+        },
+        {
+          "name": "web_search",
+          "args": {
+            "query": "OpenAI Google Anthropic AI announcements 2026",
+            "max_results": 5
+          },
+          "id": "functions.web_search:1",
+          "summary": "OpenAI Google Anthropic AI announcements 2026"
+        }
+      ],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785264482.5723476
+}

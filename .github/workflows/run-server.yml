@@ -1,0 +1,236 @@
+name: Run Kimi Chat Server
+
+on:
+  workflow_dispatch:
+    inputs:
+      duration_minutes:
+        description: "How long to keep the server running (minutes, max 350)"
+        required: false
+        default: "300"
+
+concurrency:
+  group: kimi-chat-server
+  cancel-in-progress: true
+
+jobs:
+  serve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    permissions:
+      contents: write
+
+    env:
+      KIMI_API_KEY:  ${{ secrets.KIMI_API_KEY }}
+      KIMI_BASE_URL: ${{ secrets.KIMI_BASE_URL }}
+      KIMI_MODEL:    ${{ secrets.KIMI_MODEL }}
+      GH_TOKEN:      ${{ secrets.GH_TOKEN }}
+      GH_USERNAME:   ${{ secrets.GH_USERNAME }}
+      OWNER_PASS:    ${{ secrets.OWNER_PASS }}
+      PORT: "7860"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      # ----------------------------------------------------------------
+      # Sandbox v3 extra toolchains — gives run_code much broader reach.
+      # Ubuntu 24 runners already ship gcc/g++/make/perl/php/ruby/python3
+      # and Node 20; we top up with go / rust / lua / R / kotlin and pin
+      # the numeric/data-science python stack so charts and CSV work OOTB.
+      # ----------------------------------------------------------------
+      - name: Install sandbox v3 toolchains
+        run: |
+          set -e
+          echo "::group::apt packages"
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            build-essential gcc g++ make \
+            golang-go rustc cargo \
+            default-jdk kotlin \
+            lua5.4 r-base-core \
+            php-cli ruby ruby-dev \
+            sqlite3 jq curl wget \
+            fonts-dejavu \
+            > /dev/null
+          echo "::endgroup::"
+
+          echo "::group::python data-science stack"
+          pip install --quiet --no-input \
+            numpy pandas matplotlib scipy scikit-learn \
+            requests beautifulsoup4 lxml pillow openpyxl
+          echo "::endgroup::"
+
+          echo "::group::node.js version check"
+          node --version || true
+          npm --version || true
+          echo "::endgroup::"
+
+          echo "::group::sandbox self-check"
+          python3 -c "from backend.tools.sandbox import SUPPORTED_LANGUAGES; print('sandbox v3 languages:', SUPPORTED_LANGUAGES)"
+          echo "::endgroup::"
+
+      - name: Verify required secrets
+        run: |
+          missing=()
+          [ -z "$KIMI_API_KEY"  ] && missing+=("KIMI_API_KEY")
+          [ -z "$KIMI_BASE_URL" ] && missing+=("KIMI_BASE_URL")
+          [ -z "$KIMI_MODEL"    ] && missing+=("KIMI_MODEL")
+          [ -z "$OWNER_PASS"    ] && missing+=("OWNER_PASS")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing required secrets: ${missing[*]}"
+            exit 1
+          fi
+          echo "All required secrets present."
+
+          # Do NOT print owner credentials — they are hidden from the login page on purpose.
+
+      - name: Install cloudflared
+        run: |
+          curl -L --output cloudflared.deb \
+            https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+          sudo dpkg -i cloudflared.deb
+          cloudflared --version
+
+      - name: Configure git for auto-commit
+        run: |
+          git config --global user.name "kimi-chat-bot"
+          git config --global user.email "bot@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+      - name: Start Kimi Chat backend
+        run: |
+          nohup python backend/server.py > server.log 2>&1 &
+          echo $! > server.pid
+          for i in $(seq 1 40); do
+            if curl -sf http://127.0.0.1:${PORT}/api/health >/dev/null; then
+              echo "Backend is up."
+              curl -s http://127.0.0.1:${PORT}/api/health
+              echo ""
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Backend did not become healthy in time"
+          tail -100 server.log
+          exit 1
+
+      - name: Start Cloudflare Tunnel
+        run: |
+          nohup cloudflared tunnel --url http://127.0.0.1:${PORT} \
+            --no-autoupdate --edge-ip-version auto \
+            > cloudflared.log 2>&1 &
+          echo $! > cloudflared.pid
+          public_url=""
+          for i in $(seq 1 30); do
+            public_url=$(grep -oE 'https://[a-zA-Z0-9-]+\.trycloudflare\.com' cloudflared.log | head -1 || true)
+            if [ -n "$public_url" ]; then break; fi
+            sleep 2
+          done
+          if [ -z "$public_url" ]; then
+            echo "::error::Failed to obtain Cloudflare Tunnel URL"
+            tail -60 cloudflared.log
+            exit 1
+          fi
+          echo "PUBLIC_URL=$public_url" >> $GITHUB_ENV
+          echo "::notice title=Kimi Chat is live::$public_url"
+          mkdir -p public
+          echo "$public_url" > public/URL.txt
+
+      - name: Upload public URL as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-url
+          path: public/URL.txt
+          retention-days: 3
+
+      - name: Ping backend API
+        run: |
+          echo "=== /api/health ==="
+          curl -s "http://127.0.0.1:${PORT}/api/health" || true
+          echo ""
+          echo "=== /api/debug/ping ==="
+          curl -s "http://127.0.0.1:${PORT}/api/debug/ping" || true
+          echo ""
+          echo "=== /api/models ==="
+          curl -s "http://127.0.0.1:${PORT}/api/models" || true
+          echo ""
+
+      - name: Show access info
+        run: |
+          echo "================================================================"
+          echo "  🎉 Kimi Chat is running!"
+          echo "  🌐 Open this URL in your browser:"
+          echo "     ${{ env.PUBLIC_URL }}"
+          echo "  🔐 Log in with your own account (or the owner account — credentials are private)."
+          echo "================================================================"
+          {
+            echo "## 🤖 Kimi Chat is live"
+            echo ""
+            echo "**Public URL:** ${{ env.PUBLIC_URL }}"
+            echo ""
+            echo "Register a new account or log in with the private owner credentials (kept in \`OWNER_PASS\` secret)."
+            echo ""
+            echo "The URL is temporary and changes every workflow run."
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Keep running (with periodic auto-commit of chats/users)
+        run: |
+          minutes=${{ github.event.inputs.duration_minutes }}
+          [ -z "$minutes" ] && minutes=300
+          [ "$minutes" -gt 350 ] && minutes=350
+          echo "Server will run for $minutes minutes."
+          echo "Public URL: ${{ env.PUBLIC_URL }}"
+
+          seconds=$((minutes * 60))
+          ticks=$((seconds / 30))
+          commit_every=20  # 20 * 30s = 10 min
+
+          for i in $(seq 1 $ticks); do
+            sleep 30
+            if ! kill -0 "$(cat server.pid)" 2>/dev/null; then
+              echo "::error::Backend crashed"
+              tail -200 server.log
+              exit 1
+            fi
+            # Periodic auto-commit of user data + chats
+            if [ $((i % commit_every)) -eq 0 ]; then
+              if git status --porcelain data/ 2>/dev/null | grep -q .; then
+                git add data/
+                git commit -m "chore: auto-persist chats/users [skip ci]" || true
+                git push origin HEAD:main 2>&1 || echo "(push failed, will retry next cycle)"
+              fi
+            fi
+          done
+
+          # Final commit before exit
+          if git status --porcelain data/ 2>/dev/null | grep -q .; then
+            git add data/
+            git commit -m "chore: final auto-persist chats/users [skip ci]" || true
+            git push origin HEAD:main || true
+          fi
+          echo "Session ended cleanly."
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: server-logs
+          path: |
+            server.log
+            cloudflared.log
+          retention-days: 3

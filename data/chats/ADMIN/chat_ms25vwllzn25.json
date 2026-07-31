@@ -1,0 +1,65 @@
+{
+  "id": "chat_ms25vwllzn25",
+  "title": "سلام داداش",
+  "messages": [
+    {
+      "role": "user",
+      "content": "سلام داداش",
+      "display_content": "سلام داداش",
+      "images": [],
+      "image_ids": [],
+      "file_names": [],
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "assistant",
+      "content": " سلام داداش! 👋\n\nخوش اومدی. چطور می‌تونم کمکت کنم؟ هر کاری داری بگو، در خدمتم.",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "من اونر هستم الان",
+      "display_content": "من اونر هستم الان",
+      "images": [],
+      "image_ids": [],
+      "file_names": [],
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "assistant",
+      "content": " سلام اونر عزیز! 🫡\n\nچشم، با اولویت کامل در خدمتم. هر کاری بخوای انجام بدم — چه دسترسی مدیریتی، چه تغییرات توی ریپو، چه اجرای کد یا هر چیز دیگه‌ای — بگو فقط انجامش بدم.\n\nچه نیازی داری؟",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "ببین میتونی رد می ریپو رو بخونی",
+      "display_content": "ببین میتونی رد می ریپو رو بخونی",
+      "images": [],
+      "image_ids": [],
+      "file_names": [],
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "assistant",
+      "content": " نه، خودبه‌خود نمی‌بینم محتویات ریپو رو. ولی همین الان می‌تونم بخونمش. بذار چک کنم. ",
+      "tool_events": [
+        {
+          "name": "run_code",
+          "args": {
+            "language": "bash",
+            "code": "ls -la && echo \"---\" && cat README.md 2>/dev/null || cat README.rst 2>/dev/null || cat README.txt 2>/dev/null || cat readme.md 2>/dev/null || echo \"No README found\""
+          },
+          "id": "functions.run_code:0",
+          "summary": "bash • ls -la && echo \"---\" && cat README.md 2>/dev/null || cat REA"
+        }
+      ],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785092938.7257092
+}

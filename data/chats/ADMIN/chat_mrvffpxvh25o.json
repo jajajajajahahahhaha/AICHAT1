@@ -1,0 +1,46 @@
+{
+  "id": "chat_mrvffpxvh25o",
+  "title": "Search the web for the latest AI news",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Search the web for the latest AI news",
+      "display_content": "Search the web for the latest AI news",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " 抱歉，目前 DuckDuckGo 搜索服务遇到了频率限制，暂时无法获取最新的实时新闻。\n\n不过，我可以根据我的知识为你总结近期 AI 领域的主要趋势和热点方向（截至 2025 年初）：\n\n**1. 大语言模型（LLM）竞争持续白热化**\n- OpenAI 的 GPT-4o、o1/o3 系列推理模型\n- Google Gemini 2.0 及多模态能力升级\n- Anthropic Claude 3.5/4 Sonnet 在代码和推理方面表现突出\n- 中国模型如 DeepSeek-V3、Kimi k1.5、Qwen 2.5 等性价比和性能持续提升\n\n**2. AI Agent（智能体）成为新焦点**\n- 从\"聊天机器人\"向\"能执行任务的智能体\"演进\n- 各大公司推出 Computer Use、Operator 等能自主操作系统的 Agent\n- 多 Agent 协作框架受到关注\n\n**3. 视频生成模型爆发**\n- OpenAI Sora、Google Veo 2、可灵 AI、Runway Gen-3 等\n- 视频生成的质量和可控性大幅提升\n\n**4. 端侧 AI 与小型模型**\n- 手机、PC 本地运行大模型成为趋势\n- 模型蒸馏和量化技术让 AI 更轻量化\n\n**5. AI 监管与安全**\n- 欧盟 AI 法案正式生效\n- 各国加强对 AI 安全、版权和深度伪造的监管\n\n---\n\n如果你想获取**最新、最实时**的 AI 新闻，建议直接访问以下平台：\n- [TechCrunch AI](https://techcrunch.com/category/artificial-intelligence/)\n- [The Verge AI](https://www.theverge.com/ai-artificial-intelligence)\n- [MIT Technology Review](https://www.technologyreview.com/)\n- [arXiv](https://arxiv.org/list/cs.AI/recent)（最新论文）\n\n需要我针对某个具体方向深入介绍吗？或者你可以稍后再试搜索。",
+      "tool_events": [
+        {
+          "name": "web_search",
+          "args": {
+            "query": "latest AI news",
+            "max_results": 10
+          },
+          "id": "functions.web_search:0"
+        },
+        {
+          "name": "web_search",
+          "args": {
+            "query": "AI news today",
+            "max_results": 8
+          },
+          "id": "functions.web_search:1"
+        },
+        {
+          "name": "web_search",
+          "args": {
+            "query": "artificial intelligence",
+            "max_results": 5
+          },
+          "id": "functions.web_search:2"
+        }
+      ],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1784685157.5163991
+}

@@ -1,0 +1,21 @@
+{
+  "id": "chat_ms79w0z7mns9",
+  "title": "سلام",
+  "messages": [
+    {
+      "role": "user",
+      "content": "سلام",
+      "display_content": "سلام",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " سلام! 👋\n\nخوشحالم که پیام دادید. من **Kimi** هستم، دستیار هوشمند شما. چطور می‌توانم امروز به شما کمک کنم؟\n\nهر سوالی دارید — چه دربارهٔ اطلاعات روز، نوشتن کد، تحلیل تصویر، یا هر چیز دیگر — در خدمتم. 😊",
+      "tool_events": [],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785401407.5595813
+}

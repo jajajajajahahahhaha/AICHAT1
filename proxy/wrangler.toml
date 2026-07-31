@@ -1,0 +1,6 @@
+# Cloudflare Workers config for the Kimi API reverse-proxy.
+# Deploy with:
+#   cd proxy && npx wrangler deploy
+name = "kimi-proxy"
+main = "worker.js"
+compatibility_date = "2024-11-01"

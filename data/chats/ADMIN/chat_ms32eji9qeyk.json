@@ -1,0 +1,25 @@
+{
+  "id": "chat_ms32eji9qeyk",
+  "title": "Create an image of a serene mountain landscape at",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Create an image of a serene mountain landscape at sunset",
+      "display_content": "Create an image of a serene mountain landscape at sunset",
+      "images": [
+        "blob:https://translations-symptoms-once-asks.trycloudflare.com/9aae33fd-7872-4374-bd6e-c655da52c5c4"
+      ],
+      "image_ids": [
+        "img_fdcc658a7dbe"
+      ],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_events": [],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785146981.0212533
+}

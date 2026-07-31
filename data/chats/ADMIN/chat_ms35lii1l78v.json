@@ -1,0 +1,46 @@
+{
+  "id": "chat_ms35lii1l78v",
+  "title": "مستر بیست اژداوج کرده شنیدم یه سرچ میکین ببینی درس",
+  "messages": [
+    {
+      "role": "user",
+      "content": "مستر بیست اژداوج کرده شنیدم یه سرچ میکین ببینی درسته",
+      "display_content": "مستر بیست اژداوج کرده شنیدم یه سرچ میکین ببینی درسته",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "<think>کاربر می‌خواهد درباره \"مستر بیست اژداوج\" جستجو کنم. به نظر می‌رسد این یک اصطلاح یا نام خاص است. بگذارید جستجو کنم.\n</think>\n\n\n<think>جستجو با خطای rate limit مواجه شد. بگذارید دوباره تلاش کنم.\n</think>\n\n\n<think>باز هم خطای rate limit. بگذارید با یک کوئری متفاوت امتحان کنم.\n</think>\n\n\n<think>متأسفانه سرچ با خطای rate limit مواجه می‌شود. به کاربر اطلاع می‌دهم که نتوانستم جستجو کنم.\n</think>\n\nمتأسفانه سرچ با مشکل فنی (rate limit) مواجه شد و نتونستم اطلاعاتی پیدا کنم. \n\nمیتونی بیشتر توضیح بدی منظورت از \"اژداوج\" چیه؟ شاید بتونم کمکت کنم.",
+      "tool_events": [
+        {
+          "name": "web_search",
+          "args": {
+            "query": "مستر بیست اژداوج"
+          },
+          "id": "chatcmpl-tool-b25b69d2ed754eed",
+          "summary": "مستر بیست اژداوج"
+        },
+        {
+          "name": "web_search",
+          "args": {
+            "query": "Mr Beast edgeodge"
+          },
+          "id": "chatcmpl-tool-8e66c7c114b67a74",
+          "summary": "Mr Beast edgeodge"
+        },
+        {
+          "name": "web_search",
+          "args": {
+            "query": "MrBeast edgeodge controversy"
+          },
+          "id": "chatcmpl-tool-8fb7a15b5e1c7120",
+          "summary": "MrBeast edgeodge controversy"
+        }
+      ],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785152356.4740098
+}

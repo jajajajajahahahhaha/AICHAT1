@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Logs
+*.log
+server.pid
+cloudflared.pid
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# Env
+.env
+.env.local
+
+# Wrangler
+proxy/.wrangler/
+proxy/node_modules/
+proxy/.dev.vars
+
+# Note: data/ folder IS tracked (chats + users are persisted to the repo via auto-commit)

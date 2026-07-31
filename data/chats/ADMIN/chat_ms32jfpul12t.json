@@ -1,0 +1,21 @@
+{
+  "id": "chat_ms32jfpul12t",
+  "title": "سلام منو میشناسی",
+  "messages": [
+    {
+      "role": "user",
+      "content": "سلام منو میشناسی",
+      "display_content": "سلام منو میشناسی",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_events": [],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785147190.787175
+}

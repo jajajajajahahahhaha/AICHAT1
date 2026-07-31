@@ -1,0 +1,32 @@
+{
+  "id": "chat_ms7a8pz1fzhw",
+  "title": "Create an image of a serene mountain landscape at",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Create an image of a serene mountain landscape at sunset",
+      "display_content": "Create an image of a serene mountain landscape at sunset",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": " I'll create a stunning serene mountain landscape at sunset for you! 🌄\n\n**Prompt I'm using:**\n> *Majestic snow-capped mountain range at golden hour sunset, warm orange and pink sky reflecting on alpine lake, lush green valleys, soft diffused light, long shadows, ethereal mist rolling through peaks, wide panoramic establishing shot, landscape photography, ultra-realistic, 8K, DSLR, serene and peaceful atmosphere, masterpiece, best quality, highly detailed*\n\nLet me generate this for you: ",
+      "tool_events": [
+        {
+          "name": "generate_image",
+          "args": {
+            "prompt": "Majestic snow-capped mountain range at golden hour sunset, warm orange and pink sky reflecting on a calm alpine lake, lush green valleys with wildflowers, soft diffused golden light, long dramatic shadows, ethereal mist rolling through mountain peaks, wide panoramic establishing shot, landscape photography, ultra-realistic, 8K, DSLR photograph, serene and peaceful atmosphere, awe-inspiring nature, masterpiece, best quality, highly detailed",
+            "width": 1024,
+            "height": 576
+          },
+          "id": "functions.generate_image:0",
+          "summary": "Majestic snow-capped mountain range at golden hour sunset, warm orange and pink "
+        }
+      ],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785402020.3372352
+}

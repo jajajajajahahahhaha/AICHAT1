@@ -1,0 +1,21 @@
+{
+  "id": "chat_ms35wg2h7ymf",
+  "title": "✓ auth module OK\n✓ tool signature dedupe OK\n✓ sear",
+  "messages": [
+    {
+      "role": "user",
+      "content": "✓ auth module OK\n✓ tool signature dedupe OK\n✓ search wrapper OK\n✓ sandbox python/bash/html OK\n✓ image store OK\n✓ analyze_image missing-id OK\n✓ kimi client init OK\n✓ all FastAPI routes present\n✓ image gen URL OK\n✓ tool definitions OK\n✓ model catalogue (Kimi + MiniMax) OK   ← جدید\n✓ 429 backoff helper OK                  ← جدید\n✓ per-model routing OK                   ← جدید\n\nALL TESTS PASSED ✅",
+      "display_content": "✓ auth module OK\n✓ tool signature dedupe OK\n✓ search wrapper OK\n✓ sandbox python/bash/html OK\n✓ image store OK\n✓ analyze_image missing-id OK\n✓ kimi client init OK\n✓ all FastAPI routes present\n✓ image gen URL OK\n✓ tool definitions OK\n✓ model catalogue (Kimi + MiniMax) OK   ← جدید\n✓ 429 backoff helper OK                  ← جدید\n✓ per-model routing OK                   ← جدید\n\nALL TESTS PASSED ✅",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_events": [],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785152867.952336
+}
