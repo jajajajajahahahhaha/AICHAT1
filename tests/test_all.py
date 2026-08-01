@@ -201,16 +201,60 @@ def test_tool_definitions_shape():
 
 
 def test_available_models_has_kimi_and_minimax():
-    """v2.3 — both Kimi K2.6 and MiniMax M2.7 must be selectable."""
+    """v3.1 — Kimi K2.6, MiniMax M2.7 AND Gemini(via Puter) must be selectable."""
     from backend.kimi_client import AVAILABLE_MODELS
     ids = {m["id"] for m in AVAILABLE_MODELS}
     assert "moonshotai/Kimi-K2.6" in ids
     assert "MiniMaxAI/MiniMax-M2.7" in ids
-    # Both are vision-capable and carry an explicit provider tag for routing
+    # v3.1: at least one Gemini model exposed through Puter.js
+    assert "gemini-3.6-flash" in ids
+    assert "gemini-3.1-pro-preview" in ids
+    assert "gemini-3.5-flash-lite" in ids
+    # All entries are vision-capable and carry an explicit provider tag
+    valid_providers = ("kimi", "minimax", "gemini_puter")
     for m in AVAILABLE_MODELS:
-        assert "provider" in m and m["provider"] in ("kimi", "minimax")
+        assert "provider" in m and m["provider"] in valid_providers, m
         assert m.get("vision") is True
-    print("✓ model catalogue (Kimi + MiniMax) OK")
+    # There must be at least one server-side model AND at least one gemini_puter
+    providers = {m["provider"] for m in AVAILABLE_MODELS}
+    assert "kimi" in providers or "minimax" in providers
+    assert "gemini_puter" in providers
+    print("✓ model catalogue (Kimi + MiniMax + Gemini/Puter) OK")
+
+
+def test_tools_exec_endpoint_registered():
+    """v3.1 — the /api/tools/exec bridge (used by the Gemini/Puter client)
+    must be registered so the browser-side Puter loop can execute tools."""
+    from backend.server import app
+    paths = {getattr(r, "path", "") for r in app.routes}
+    assert "/api/tools/exec" in paths, "missing /api/tools/exec"
+    print("✓ /api/tools/exec endpoint registered")
+
+
+def test_kimi_client_no_key_gemini_ok():
+    """v3.1 — KimiClient must NOT crash on missing KIMI_API_KEY when the
+    default model is a Gemini(Puter) one (browser handles the traffic)."""
+    import os
+    from backend.kimi_client import KimiClient
+    saved_key = os.environ.pop("KIMI_API_KEY", None)
+    saved_model = os.environ.pop("KIMI_MODEL", None)
+    try:
+        # Gemini model: no key needed — must succeed
+        c = KimiClient(model="gemini-3.6-flash")
+        assert c.model == "gemini-3.6-flash"
+        # Kimi model with no key must still fail loudly
+        raised = False
+        try:
+            KimiClient(model="moonshotai/Kimi-K2.6")
+        except RuntimeError:
+            raised = True
+        assert raised, "Kimi model with no API key should raise"
+    finally:
+        if saved_key is not None:
+            os.environ["KIMI_API_KEY"] = saved_key
+        if saved_model is not None:
+            os.environ["KIMI_MODEL"] = saved_model
+    print("✓ KimiClient key requirement respects provider")
 
 
 def test_backoff_helper_429_grows():
@@ -732,6 +776,8 @@ if __name__ == "__main__":
     test_image_gen_returns_url()
     test_tool_definitions_shape()
     test_available_models_has_kimi_and_minimax()
+    test_tools_exec_endpoint_registered()
+    test_kimi_client_no_key_gemini_ok()
     test_backoff_helper_429_grows()
     test_client_routes_minimax_separately()
     # v2.4 regression tests
