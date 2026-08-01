@@ -796,6 +796,35 @@ async def api_generate_image(req: ImageGenRequest, authorization: Optional[str] 
     return await generate_image(req.prompt, req.width, req.height)
 
 
+class ToolExecRequest(BaseModel):
+    """Payload the Puter/Gemini frontend uses to run one of our server-side
+    tools. Kept intentionally permissive: `arguments` is a free-form dict
+    that mirrors what the model emitted in <tool_call>{...}</tool_call>."""
+    name: str
+    arguments: Dict[str, Any] = {}
+    model: Optional[str] = None
+
+
+@app.post("/api/tools/exec")
+async def api_tools_exec(req: ToolExecRequest,
+                        authorization: Optional[str] = Header(None)):
+    """
+    Single entry-point for the client-side (Puter/Gemini) chat loop.
+
+    Kimi / MiniMax go through /api/chat/stream where tools are dispatched
+    server-side. Gemini via Puter.js runs entirely in the browser, so it
+    needs a way to call the very same tool implementations. Rather than
+    duplicate the four tools in JavaScript, we expose one thin HTTP endpoint
+    that reuses execute_tool() -- so `web_search`, `run_code`, `analyze_image`,
+    and `generate_image` behave EXACTLY the same regardless of which model
+    triggered them. Nothing is removed from the existing pipeline; this is
+    purely additive.
+    """
+    require_user(authorization)
+    result = await execute_tool(req.name, req.arguments or {}, model=req.model)
+    return {"ok": True, "name": req.name, "result": result}
+
+
 @app.post("/api/run")
 async def api_run(payload: Dict[str, Any], authorization: Optional[str] = Header(None)):
     """Manual sandbox runner used by the frontend "Run" button.

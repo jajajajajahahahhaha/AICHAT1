@@ -14,6 +14,13 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.10.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script>
+  <!--
+    Puter.js -- client-side SDK that gives us FREE access to Gemini models
+    (see https://developer.puter.com/tutorials/free-gemini-api/). Only used
+    when the user picks a `gemini-*` model in the picker; all other models
+    keep going through /api/chat/stream on the server.
+  -->
+  <script src="https://js.puter.com/v2/" defer></script>
 </head>
 <body>
   <div class="sidebar-overlay" id="sidebarOverlay"></div>
@@ -178,6 +185,7 @@
   </div>
 
   <script src="/static/js/i18n.js"></script>
+  <script src="/static/js/puter_client.js"></script>
   <script src="/static/js/app.js"></script>
 </body>
 </html>

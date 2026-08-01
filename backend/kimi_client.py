@@ -45,6 +45,7 @@ class KimiAPIError(RuntimeError):
 # Kept as a module-level constant so the /api/models endpoint and the frontend
 # picker stay in sync with what the client actually knows how to talk to.
 AVAILABLE_MODELS = [
+    # -- Kimi / MiniMax (server-side via Cloudflare Worker proxy) ------------
     {
         "id": "moonshotai/Kimi-K2.6",
         "name": "Kimi K2.6",
@@ -56,6 +57,51 @@ AVAILABLE_MODELS = [
         "name": "MiniMax M2.7",
         "vision": True,
         "provider": "minimax",
+    },
+
+    # -- Gemini via Puter.js (client-side, free, no API key) -----------------
+    # These IDs are Puter.js model identifiers -- see
+    # https://developer.puter.com/tutorials/free-gemini-api/ .
+    # The frontend detects provider=="gemini_puter" and routes the request
+    # through puter_client.js instead of calling KimiClient on the server,
+    # so no server-side credentials are needed. All four tools
+    # (web_search / run_code / analyze_image / generate_image) still work
+    # thanks to the /api/tools/exec bridge in server.py.
+    {
+        "id": "gemini-3.6-flash",
+        "name": "Gemini 3.6 Flash",
+        "vision": True,
+        "provider": "gemini_puter",
+    },
+    {
+        "id": "gemini-3.1-pro-preview",
+        "name": "Gemini 3.1 Pro",
+        "vision": True,
+        "provider": "gemini_puter",
+    },
+    {
+        "id": "gemini-3.5-flash-lite",
+        "name": "Gemini 3.5 Flash-Lite",
+        "vision": True,
+        "provider": "gemini_puter",
+    },
+    {
+        "id": "gemini-2.5-pro",
+        "name": "Gemini 2.5 Pro",
+        "vision": True,
+        "provider": "gemini_puter",
+    },
+    {
+        "id": "gemini-2.5-flash",
+        "name": "Gemini 2.5 Flash",
+        "vision": True,
+        "provider": "gemini_puter",
+    },
+    {
+        "id": "gemini-2.0-flash",
+        "name": "Gemini 2.0 Flash",
+        "vision": True,
+        "provider": "gemini_puter",
     },
 ]
 
@@ -127,8 +173,13 @@ class KimiClient:
         self.proxy = os.getenv("KIMI_PROXY", "").strip() or None
         self.impersonate = DEFAULT_IMPERSONATE
 
+        # Kimi/MiniMax need a server key; Gemini via Puter runs entirely in
+        # the browser and never touches this client, so a missing KIMI_API_KEY
+        # is only fatal when we actually try to talk to Kimi/MiniMax.
         if not self.api_key:
-            raise RuntimeError("KIMI_API_KEY is not set")
+            provider = _model_meta(self.model).get("provider", "kimi")
+            if provider != "gemini_puter":
+                raise RuntimeError("KIMI_API_KEY is not set")
 
     # ---- per-model routing ---------------------------------------------------
     def _route_for(self, model_id: str) -> Dict[str, str]:

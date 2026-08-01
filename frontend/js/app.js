@@ -1031,99 +1031,132 @@ async function streamAssistantResponse() {
   let gotAnything = false;
   let typer = null;  // lazy — only created once the first delta arrives
 
-  try {
-    const res = await fetch("/api/chat/stream", {
-      method: "POST",
-      headers: authHeaders({ "Content-Type": "application/json" }),
-      body: JSON.stringify({
-        messages: apiMessages,
-        chat_id: state.chatId,
-        model: state.currentModel,
-        mode: state.currentMode,
-        attached_images: attachedImageIds,
-        agent_mode: state.agentMode || "normal",
-        agent_id: state.selectedAgentId || null,
-      }),
-      signal: state.abortController.signal,
-    });
-    if (!res.ok || !res.body) {
-      let detail = "HTTP " + res.status;
-      try { const j = await res.json(); detail = j.detail || detail; } catch {}
-      throw new Error(detail);
+  // -----------------------------------------------------------------
+  // Handle exactly one {event, data} pair — same logic whether it came
+  // from the server's SSE stream (Kimi / MiniMax) or from the local
+  // PuterGemini async generator. Extracting it into a closure keeps the
+  // two paths byte-identical when it comes to UI updates.
+  // -----------------------------------------------------------------
+  const handleEvent = async (eventName, data) => {
+    if (eventName === "thinking") {
+      gotAnything = true;
+    } else if (eventName === "delta") {
+      gotAnything = true;
+      removeThinking();
+      accumulated += data.content;
+      if (!typer) typer = createSmoothTyper(contentEl, { charsPerSecond: 35 });
+      typer.feed(data.content);
+    } else if (eventName === "tool_call") {
+      gotAnything = true;
+      removeThinking();
+      const notice = document.createElement("div");
+      notice.className = "tool-notice";
+      notice.dataset.callId = data.id;
+      notice.innerHTML = `<span class="spinner"></span> ${toolLabel(data.name)} <em>${escapeHtml(shortenArgs(data.name, data.args))}</em>${data.duplicate ? ' <span class="dup-badge">dup</span>' : ''}`;
+      strip.appendChild(notice);
+      asstMsg.tool_events.push({ name: data.name, args: data.args, id: data.id, summary: shortenArgs(data.name, data.args) });
+    } else if (eventName === "tool_result") {
+      const notice = strip.querySelector(`[data-call-id="${data.id}"]`);
+      if (notice) {
+        notice.classList.add("done");
+        const spinner = notice.querySelector(".spinner");
+        if (spinner) spinner.outerHTML = `<span class="check">✓</span>`;
+      }
+    } else if (eventName === "image_generated") {
+      gotAnything = true;
+      removeThinking();
+      mountGeneratedImage(strip, data.url, data.prompt || "");
+      asstMsg.generated_images.push({ url: data.url, prompt: data.prompt });
+    } else if (eventName === "done") {
+      gotAnything = true;
+      removeThinking();
+      if (typer) { typer.finish(); }
+      await new Promise((r) => setTimeout(r, 40));
+      if (typer) { typer.flush(); }
+      contentEl.innerHTML = renderMarkdown(accumulated);
+      enhanceCodeBlocks(contentEl);
+    } else if (eventName === "error") {
+      removeThinking();
+      errored = true;
+      const err = document.createElement("div");
+      err.className = "tool-notice error";
+      err.textContent = "⚠ " + data.message;
+      strip.appendChild(err);
     }
+    scrollToBottom();
+  };
 
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const events = buffer.split("\n\n");
-      buffer = events.pop() || "";
-      for (const rawEvent of events) {
-        const lines = rawEvent.split("\n");
-        let eventName = "message", dataStr = "";
-        for (const line of lines) {
-          if (line.startsWith("event:")) eventName = line.slice(6).trim();
-          else if (line.startsWith("data:")) dataStr += line.slice(5).trim();
-        }
-        if (!dataStr) continue;
-        let data;
-        try { data = JSON.parse(dataStr); } catch { continue; }
+  // -----------------------------------------------------------------
+  // Route: Gemini models run in the browser via Puter.js; everything
+  // else goes through the server's SSE endpoint. The event protocol is
+  // identical for both — see puter_client.js for the client-side loop.
+  // -----------------------------------------------------------------
+  const useGemini = window.PuterGemini && window.PuterGemini.isGeminiModel(state.currentModel);
 
-        if (eventName === "thinking") {
-          // heartbeat from server; keep the indicator alive
-          gotAnything = true;
-        } else if (eventName === "delta") {
-          gotAnything = true;
-          removeThinking();
-          accumulated += data.content;
-          // Feed the smooth typer instead of instantly re-rendering. This turns
-          // chunky server bursts into a steady, ChatGPT-style live typing feel.
-          if (!typer) typer = createSmoothTyper(contentEl, { charsPerSecond: 35 });
-          typer.feed(data.content);
-        } else if (eventName === "tool_call") {
-          gotAnything = true;
-          removeThinking();
-          const notice = document.createElement("div");
-          notice.className = "tool-notice";
-          notice.dataset.callId = data.id;
-          notice.innerHTML = `<span class="spinner"></span> ${toolLabel(data.name)} <em>${escapeHtml(shortenArgs(data.name, data.args))}</em>${data.duplicate ? ' <span class="dup-badge">dup</span>' : ''}`;
-          strip.appendChild(notice);
-          asstMsg.tool_events.push({ name: data.name, args: data.args, id: data.id, summary: shortenArgs(data.name, data.args) });
-        } else if (eventName === "tool_result") {
-          const notice = strip.querySelector(`[data-call-id="${data.id}"]`);
-          if (notice) {
-            notice.classList.add("done");
-            const spinner = notice.querySelector(".spinner");
-            if (spinner) spinner.outerHTML = `<span class="check">✓</span>`;
+  try {
+    if (useGemini) {
+      // ---- Gemini via Puter.js (client-side) --------------------------
+      const systemPrompt = buildClientSystemPrompt(state.currentMode);
+      const enrichedMessages = enrichLastUserWithImageMarkers(apiMessages, attachedImageIds);
+
+      const gen = window.PuterGemini.streamChat({
+        model: state.currentModel,
+        messages: enrichedMessages,
+        systemPrompt,
+        enableTools: true,
+        authHeaders,
+        temperature: modeTemp(state.currentMode),
+        maxTokens: modeMaxTokens(state.currentMode),
+        signal: state.abortController.signal,
+      });
+
+      for await (const evt of gen) {
+        if (state.abortController.signal.aborted) break;
+        await handleEvent(evt.event, evt.data);
+      }
+    } else {
+      // ---- Kimi / MiniMax via server SSE (existing path, unchanged) ---
+      const res = await fetch("/api/chat/stream", {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json" }),
+        body: JSON.stringify({
+          messages: apiMessages,
+          chat_id: state.chatId,
+          model: state.currentModel,
+          mode: state.currentMode,
+          attached_images: attachedImageIds,
+          agent_mode: state.agentMode || "normal",
+          agent_id: state.selectedAgentId || null,
+        }),
+        signal: state.abortController.signal,
+      });
+      if (!res.ok || !res.body) {
+        let detail = "HTTP " + res.status;
+        try { const j = await res.json(); detail = j.detail || detail; } catch {}
+        throw new Error(detail);
+      }
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || "";
+        for (const rawEvent of events) {
+          const lines = rawEvent.split("\n");
+          let eventName = "message", dataStr = "";
+          for (const line of lines) {
+            if (line.startsWith("event:")) eventName = line.slice(6).trim();
+            else if (line.startsWith("data:")) dataStr += line.slice(5).trim();
           }
-        } else if (eventName === "image_generated") {
-          gotAnything = true;
-          removeThinking();
-          const imgEl = mountGeneratedImage(strip, data.url, data.prompt || "");
-          asstMsg.generated_images.push({ url: data.url, prompt: data.prompt });
-        } else if (eventName === "done") {
-          gotAnything = true;
-          removeThinking();
-          // Let the typer drain whatever's still queued in its buffer, then
-          // settle the DOM (drops the cursor + fresh span, re-enhances code).
-          if (typer) { typer.finish(); }
-          // Give the typer a moment to visually catch up before final polish.
-          await new Promise((r) => setTimeout(r, 40));
-          if (typer) { typer.flush(); }
-          contentEl.innerHTML = renderMarkdown(accumulated);
-          enhanceCodeBlocks(contentEl);
-        } else if (eventName === "error") {
-          removeThinking();
-          errored = true;
-          const err = document.createElement("div");
-          err.className = "tool-notice error";
-          err.textContent = "⚠ " + data.message;
-          strip.appendChild(err);
+          if (!dataStr) continue;
+          let data;
+          try { data = JSON.parse(dataStr); } catch { continue; }
+          await handleEvent(eventName, data);
         }
-        scrollToBottom();
       }
     }
   } catch (err) {
@@ -1158,6 +1191,83 @@ async function streamAssistantResponse() {
     }
     await saveChat();
   }
+}
+
+// ============================================================
+//  Client-side helpers for the Gemini (Puter.js) route
+// ============================================================
+//  These mirror the small pieces of behaviour the server does
+//  in backend/server.py for Kimi/MiniMax, so Gemini gets the
+//  same system prompt shape, mode-based tuning, and image
+//  attachment handling. Nothing is removed from the server
+//  path -- this ONLY runs when a `gemini-*` model is selected.
+// ============================================================
+
+function modeTemp(mode) {
+  if (mode === "lite")     return 0.4;
+  if (mode === "thinking") return 0.6;
+  return 0.7; // fast (default)
+}
+
+function modeMaxTokens(mode) {
+  if (mode === "lite")     return 1024;
+  if (mode === "thinking") return 8192;
+  return 4096; // fast (default)
+}
+
+/**
+ * Base system prompt for Gemini (mirrors server.py's shape). Mode tweaks
+ * are appended so `lite` stays terse and `thinking` reasons step-by-step.
+ * The tool schema is added on top by puter_client.js buildToolPrompt().
+ */
+function buildClientSystemPrompt(mode) {
+  const modeExtra =
+    mode === "lite"
+      ? "\n\nBe concise. Prefer short direct answers unless the user explicitly asks for detail."
+      : mode === "thinking"
+      ? "\n\nThink step by step. Reason carefully about the problem, break it into parts, then give a clear final answer."
+      : "";
+
+  return (
+    "You are a precise, helpful AI assistant running in the Kimi Chat interface.\n\n" +
+    "Rules:\n" +
+    "  - Reply in the SAME language as the user (Persian <-> English).\n" +
+    "  - Format code as fenced blocks with a language tag (```python, ```html, ...).\n" +
+    "  - After tools finish, ALWAYS produce a final text answer for the user.\n" +
+    "  - Never claim you didn't receive an image when an [IMAGE_ATTACHED: img_...]\n" +
+    "    marker is present in the user message -- that means the image IS available;\n" +
+    "    call analyze_image with that id." +
+    modeExtra
+  );
+}
+
+/**
+ * Append [IMAGE_ATTACHED: img_xxx] markers to the LAST user message so the
+ * model knows which image_ids to feed into analyze_image. Same technique the
+ * server uses in backend/server.py -- duplicated here so both paths look
+ * identical from the model's point of view.
+ */
+function enrichLastUserWithImageMarkers(messages, imageIds) {
+  if (!Array.isArray(imageIds) || !imageIds.length) return messages;
+  const copy = messages.map((m) => ({ ...m }));
+  for (let i = copy.length - 1; i >= 0; i--) {
+    if (copy[i].role === "user") {
+      const marker = imageIds.map((id) => `[IMAGE_ATTACHED: ${id}]`).join(" ");
+      const hint =
+        "\n\n" +
+        marker +
+        "\n[SYSTEM NOTE TO ASSISTANT] The user just uploaded " +
+        imageIds.length +
+        " image(s) with image_id(s): " +
+        imageIds.join(", ") +
+        ". You CANNOT see them from this text alone. You MUST call the `analyze_image` " +
+        "tool with each image_id exactly as given to actually look at the picture. " +
+        "Do this BEFORE writing your reply.";
+      copy[i] = { ...copy[i], content: String(copy[i].content || "") + hint };
+      break;
+    }
+  }
+  return copy;
 }
 
 function shortenArgs(name, args) {
