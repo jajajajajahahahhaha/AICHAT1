@@ -1,0 +1,81 @@
+{
+  "id": "chat_msadybe5m1b9",
+  "title": "سلام",
+  "messages": [
+    {
+      "role": "user",
+      "content": "سلام",
+      "display_content": "سلام",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "سلام! چطور می‌توانم کمکتان کنم؟",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "https://github.com/jajajajajahahahhaha/AICHAT1",
+      "display_content": "https://github.com/jajajajajahahahhaha/AICHAT1",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "به نظر می‌رسد مخزن `AICHAT1` در GitHub وجود ندارد. آیا منظور شما مخزن دیگری از این کاربر بود؟ (مانند `AICHAT` یا `AI`)",
+      "tool_events": [
+        {
+          "name": "web_search",
+          "args": {
+            "query": "https://github.com/jajajajajahahahhaha/AICHAT1"
+          },
+          "id": "gcall_vnji6jwm",
+          "summary": "https://github.com/jajajajajahahahhaha/AICHAT1"
+        }
+      ],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "تو اینو کلون کن ساختار هاش و رد میشو برام بفرشت",
+      "display_content": "تو اینو کلون کن ساختار هاش و رد میشو برام بفرشت",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "متاسفم، اما همانطور که در پیام قبلی اشاره کردم، مخزن `https://github.com/jajajajajahahahhaha/AICHAT1` در گیت‌هاب وجود ندارد. بنابراین، نمی‌توانم آن را کلون کنم یا ساختارش را برای شما ارسال کنم.\n\nلطفاً آدرس صحیح مخزن را بررسی کرده و دوباره برای من ارسال کنید.",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "چرا داره تو کلون کن",
+      "display_content": "چرا داره تو کلون کن",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "نتایج جستجوی من نشان می‌دهد که مخزن `AICHAT1` در حساب کاربری `jajajajajahahahhaha` وجود ندارد.\n\nمخازنی که برای این کاربر در گیت‌هاب پیدا شده‌اند عبارتند از:\n*   `AI`\n*   `AICHAT`\n*   `AITEST`\n\nآیا منظور شما یکی از این مخازن بود؟ لطفاً نام صحیح مخزن را به من بگویید تا بتوانم به شما کمک کنم.",
+      "tool_events": [
+        {
+          "name": "web_search",
+          "args": {
+            "query": "https://github.com/jajajajajahahahhaha/AICHAT1"
+          },
+          "id": "gcall_n2fyvoyj",
+          "summary": "https://github.com/jajajajajahahahhaha/AICHAT1"
+        }
+      ],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785589711.5711026
+}
