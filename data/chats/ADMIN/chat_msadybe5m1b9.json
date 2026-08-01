@@ -75,7 +75,30 @@
         }
       ],
       "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "https://github.com/jajajajajahahahhaha/AICHAT1.git اینو کلون کن",
+      "display_content": "https://github.com/jajajajajahahahhaha/AICHAT1.git اینو کلون کن",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "متاسفم، اما نتایج جستجو دوباره نشان می‌دهد که مخزن `AICHAT1` در حساب کاربری `jajajajajahahahhaha` در گیت‌هاب وجود ندارد.\n\nمخازنی که برای این کاربر پیدا شد عبارتند از:\n*   `https://github.com/jajajajajahahahhaha/AICHAT`\n*   `https://github.com/jajajajajahahahhaha/AI`\n\nلطفاً مطمئن شوید که آدرس مخزن را به درستی وارد کرده‌اید. اگر منظور شما یکی از مخازن بالا است، لطفاً نام صحیح آن را به من بگویید.",
+      "tool_events": [
+        {
+          "name": "web_search",
+          "args": {
+            "query": "github.com/jajajajajahahahhaha/AICHAT1.git"
+          },
+          "id": "gcall_ls88px5e",
+          "summary": "github.com/jajajajajahahahhaha/AICHAT1.git"
+        }
+      ],
+      "generated_images": []
     }
   ],
-  "updated_at": 1785589711.5711026
+  "updated_at": 1785589770.3222744
 }
