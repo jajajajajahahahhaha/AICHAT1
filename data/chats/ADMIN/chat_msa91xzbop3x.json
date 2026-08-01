@@ -1,0 +1,49 @@
+{
+  "id": "chat_msa91xzbop3x",
+  "title": "سلام",
+  "messages": [
+    {
+      "role": "user",
+      "content": "سلام",
+      "display_content": "سلام",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "سلام",
+      "display_content": "سلام",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "سلام",
+      "display_content": "سلام",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_events": [],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785581550.0071964
+}
