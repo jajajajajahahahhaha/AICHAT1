@@ -1,0 +1,49 @@
+{
+  "id": "chat_msaau41213gc",
+  "title": "س",
+  "messages": [
+    {
+      "role": "user",
+      "content": "س",
+      "display_content": "س",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "سلام! چطور می‌تونم کمکتون کنم؟",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "س",
+      "display_content": "س",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "میدونستی خورشید پشتش به ماست",
+      "display_content": "میدونستی خورشید پشتش به ماست",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "در واقع، خورشید همیشه یک طرفش به سمت ماست. ما همیشه همان سمتی از خورشید را می‌بینیم که به سمت زمین است. خورشید به دور خودش می‌چرخد، اما این چرخش باعث نمی‌شود که \"پشت\" آن به ما باشد.",
+      "tool_events": [],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1785584409.9138126
+}

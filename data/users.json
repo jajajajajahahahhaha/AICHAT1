@@ -16,5 +16,11 @@
     "password_hash": "$2b$12$xAKlDX4BX/RgsIj1O2j0pOKg8d3n.cx.62k1kUPobgtgi11xgOfsu",
     "is_owner": true,
     "created_at": 1784683735.300769
+  },
+  "aتdmin": {
+    "username": "aتdmin",
+    "password_hash": "$2b$12$Q86WkJS7ksFxs/AWtWEro.7THR/lShTZQx9ibC2IowpckNAObJ2Te",
+    "is_owner": false,
+    "created_at": 1785584443.2210143
   }
 }
