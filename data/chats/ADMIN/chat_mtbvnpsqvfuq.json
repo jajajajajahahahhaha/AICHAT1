@@ -1,0 +1,21 @@
+{
+  "id": "chat_mtbvnpsqvfuq",
+  "title": "سلام",
+  "messages": [
+    {
+      "role": "user",
+      "content": "سلام",
+      "display_content": "سلام",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "<think>The user greeted me in Persian/Farsi saying \"سلام\" which means \"Hello\". I should respond in Persian/Farsi as per the rules.\n</think>\n\nسلام! 👋\n\nخوش آمدید! من کیمی هستم، دستیار هوش مصنوعی شما. چطور می‌تونم کمکتون کنم؟",
+      "tool_events": [],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1787856629.9146209
+}
