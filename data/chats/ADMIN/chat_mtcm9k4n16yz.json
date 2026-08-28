@@ -1,0 +1,49 @@
+{
+  "id": "chat_mtcm9k4n16yz",
+  "title": "Search the web for the latest AI news in 2026",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Search the web for the latest AI news in 2026",
+      "display_content": "Search the web for the latest AI news in 2026",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "J",
+      "display_content": "J",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "I cannot search for news from the future, as my knowledge is limited to information available up to early 2023, and I can only search the web for current information. The year 2026 has not happened yet.\n\nIf you would like, I can search for the latest AI news from today.",
+      "tool_events": [],
+      "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "سلام",
+      "display_content": "سلام",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "سلام! چطور میتونم کمکتون کنم؟",
+      "tool_events": [],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1787901338.0537794
+}
