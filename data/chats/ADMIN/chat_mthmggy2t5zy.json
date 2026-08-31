@@ -1,0 +1,47 @@
+{
+  "id": "chat_mthmggy2t5zy",
+  "title": "Create an image of a serene mountain landscape at",
+  "messages": [
+    {
+      "role": "user",
+      "content": "Create an image of a serene mountain landscape at sunset",
+      "display_content": "Create an image of a serene mountain landscape at sunset",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "\n\nHeres coming right up! 🎨\n",
+      "tool_events": [
+        {
+          "name": "generate_image",
+          "args": {
+            "height": 576,
+            "prompt": "Cyberpunk city at night, neon-lit skyscrapers towering into fog, rain-soaked streets reflecting colorful neon lights, flying cars in the distance, holographic advertisements, bustling street market, blade runner aesthetic, dramatic lighting, ultra-realistic, 8K, masterpiece, best quality",
+            "width": 1024
+          },
+          "id": "call_887a11ec8541488eba3e0482",
+          "summary": "Cyberpunk city at night, neon-lit skyscrapers towering into fog, rain-soaked str"
+        },
+        {
+          "name": "generate_image",
+          "args": {
+            "height": 576,
+            "prompt": "Serene mountain landscape at sunset, golden hour lighting, snow-capped peaks, peaceful alpine lake reflecting mountains, wildflowers in foreground, soft clouds, warm orange and pink sky, peaceful atmosphere, panoramic view, nature photography, ultra-realistic, 8K, masterpiece, best quality",
+            "width": 1024
+          },
+          "id": "call_1791eb2da769447d8c824530",
+          "summary": "Serene mountain landscape at sunset, golden hour lighting, snow-capped peaks, pe"
+        }
+      ],
+      "generated_images": [
+        {
+          "url": "https://image.pollinations.ai/prompt/Cyberpunk%20city%20at%20night%2C%20neon-lit%20skyscrapers%20towering%20into%20fog%2C%20rain-soaked%20streets%20reflecting%20colorful%20neon%20lights%2C%20flying%20cars%20in%20the%20distance%2C%20holographic%20advertisements%2C%20bustling%20street%20market%2C%20blade%20runner%20aesthetic%2C%20dramatic%20lighting%2C%20ultra-realistic%2C%208K%2C%20masterpiece%2C%20best%20quality?width=1024&height=576&nologo=true&seed=952140&model=flux",
+          "prompt": "Cyberpunk city at night, neon-lit skyscrapers towering into fog, rain-soaked streets reflecting colorful neon lights, flying cars in the distance, holographic advertisements, bustling street market, blade runner aesthetic, dramatic lighting, ultra-realistic, 8K, masterpiece, best quality"
+        }
+      ]
+    }
+  ],
+  "updated_at": 1788203969.232528
+}
