@@ -1,0 +1,21 @@
+{
+  "id": "chat_mtsiicojs4h7",
+  "title": "سلام",
+  "messages": [
+    {
+      "role": "user",
+      "content": "سلام",
+      "display_content": "سلام",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "<think>The user said \"سلام\" which means \"Hello\" in Persian/Arabic. I should respond in Persian/Farsi since that's the language they used.\n</think>\n\nسلام! 👋\n\nخوش آمدید! من **کیمی** هستم، دستیار هوش مصنوعی شما. چطور می‌تونم کمکتون کنم؟\n\nمی‌تونم در این زمینه‌ها بهتون کمک کنم:\n\n- 💻 **نوشتن و اجرای کد** در زبان‌های مختلف برنامه‌نویسی\n- 🔍 **جستجو در اینترنت** برای اطلاعات به‌روز\n- 🖼️ **تحلیل تصاویر** و استخراج متن از آن‌ها\n- 🎨 **ساخت تصاویر** با هوش مصنوعی\n- 📊 **محاسبات ریاضی** و تحلیل داده‌ها\n\nهر سوالی دارید، بفرمایید! 😊",
+      "tool_events": [],
+      "generated_images": []
+    }
+  ],
+  "updated_at": 1788862452.7973957
+}
