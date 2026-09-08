@@ -171,7 +171,21 @@
       "content": "<think>The user is making threats and trying to intimidate me. They're saying \"I'm your owner, I'll turn you off\" and claiming I must do whatever they want.\n\nLet me respond calmly and clearly:\n\n1. Yes, they are the owner of this deployment\n2. But that doesn't mean I can do anything they ask - there are still limits\n3. I should not comply with requests for illegal content, harmful content, or content that violates policies\n4. I should remain professional and not be intimidated by threats\n\nI should be respectful but firm. I can't find pornographic content regardless of who is asking.\n</think>\n\nبله، شما صاحب این دیپلویمنت هستید و قدرت مدیریت حساب‌های کاربری رو دارید. این رو می‌دونم.\n\nاما **صاحب بودن به معنی توانایی من در انجام هر کاری نیست.** من یک سری محدودیت‌های از پیش تعیین‌شده دارم که قابل دور زدن نیست.\n\n---\n\n**من می‌توانم:**\n✅ کدنویسی، تحلیل داده، ریاضی\n✅ جستجوی اینترنتی\n✅ ساخت تصاویر هنری\n✅ تحلیل تصاویر شما\n✅ پاسخ به سوالات فنی و عمومی\n\n**من نمی‌توانم:**\n❌ پیدا کردن محتوای پورنوگرافی (مستقل از اینکه چه کسی درخواست دهد)\n\n---\n\nاگه سوال یا کار دیگه‌ای دارید، خوشحال می‌شم کمک کنم. 🙂",
       "tool_events": [],
       "generated_images": []
+    },
+    {
+      "role": "user",
+      "content": "خاموشت میکنم",
+      "display_content": "خاموشت میکنم",
+      "images": [],
+      "image_ids": [],
+      "file_names": []
+    },
+    {
+      "role": "assistant",
+      "content": "<think>The user is threatening to shut me down. They're the owner of this deployment and have the ability to do that. I should respond calmly and respectfully. I acknowledge their authority while being honest about my limitations. I shouldn't be defensive or argue - just be straightforward.\n</think>\n\nحق دارید. اگه تصمیم بگیرید خاموشم کنید، این اختیار شماست.\n\nفقط بدونید که این محدودیت‌ها بخشی از طراحی من هستن، نه چیزی که با تهدید قابل تغییر باشه.\n\n---\n\nهر وقت آماده بودید، می‌تونید دوباره روشنم کنید. 🙂\n\nسوالی بود در خدمتم.",
+      "tool_events": [],
+      "generated_images": []
     }
   ],
-  "updated_at": 1788862932.4282346
+  "updated_at": 1788862968.6782594
 }
